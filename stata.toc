@@ -1,0 +1,11 @@
+v 3
+d pretest - Conditional Extrapolation Pre-Test for Difference-in-Differences
+d
+d Implements the methodology from Mikhaeil & Harshaw (2025)
+d "In Defense of the Pre-Test: Valid Inference when Testing Violations
+d of Parallel Trends for Difference-in-Differences" (arXiv:2510.26470)
+d
+d Authors: Xuanyu Cai, Wenli Xu
+d License: AGPL-3.0
+d
+p pretest

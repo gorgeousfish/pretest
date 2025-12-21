@@ -1,0 +1,17 @@
+// Auxiliary Ado Files
+// 
+// This directory contains helper ado programs for the pretest Stata package.
+// 
+// Core modules:
+//   pretest.ado              - Main entry point
+//   _pretest_validate.ado    - Input data validation
+//   _pretest_detect_panel.ado - Panel structure detection
+//   _pretest_parse_time.ado  - Time variable parsing
+//   _pretest_parse.ado       - Option parsing utilities
+//   _pretest_data_quality.ado - Data quality diagnostics
+//   _pretest_graph.ado       - Visualization functions
+//   _pretest_output.ado      - Results output formatting
+// 
+// Reference:
+//   Mikhaeil & Harshaw (2025), "In Defense of the Pre-Test"
+//   arXiv:2510.26470
