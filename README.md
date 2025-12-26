@@ -70,7 +70,7 @@ xtdidregress (y) (d), group(id) time(t)
 ### From GitHub
 
 ```stata
-net install pretest, from("https://raw.githubusercontent.com/gorgeousfish/pretest/main/pretest-stata/") replace
+net install pretest, from("https://raw.githubusercontent.com/gorgeousfish/pretest/main/") replace
 ```
 
 ### Local Installation
