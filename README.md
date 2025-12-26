@@ -49,7 +49,7 @@ cannot be computed. In such cases:
 **Common causes:**
 
 - Missing values in treatment or outcome variables creating empty cells
-- Survey data with irregular interview schedules (e.g., `nlswork` with gaps)
+- Survey data with irregular interview schedules
 - Sample restrictions that eliminate entire time periods for one group
 
 **Solution:** Ensure at least one observation per time-treatment cell, or restrict
@@ -58,12 +58,7 @@ analysis to time periods with complete coverage.
 ### Two-Period Designs
 
 This command **cannot be used** for canonical 2×2 DID designs with only two time
-periods. For such cases, use standard DID estimators:
-
-```stata
-regress y i.treat##i.post
-xtdidregress (y) (d), group(id) time(t)
-```
+periods.
 
 ## Installation
 
@@ -73,11 +68,7 @@ xtdidregress (y) (d), group(id) time(t)
 net install pretest, from("https://raw.githubusercontent.com/gorgeousfish/pretest/main/") replace
 ```
 
-### Local Installation
 
-```stata
-net install pretest, from("/path/to/pretest-stata/") replace
-```
 
 ## Quick Start
 
