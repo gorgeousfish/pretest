@@ -1,60 +1,71 @@
-*! _pretest_ci.mata v0.1.0
-*! Conditionally Valid Confidence Intervals for Pre-Test Framework
+*! _pretest_ci.mata
+*! Conditionally Valid Confidence Intervals for the Pre-Test DID Framework
 *!
 *! Description:
-*!   Implements confidence interval construction for the conditional
-*!   extrapolation pre-test framework in difference-in-differences designs.
-*!   These CIs are valid conditional on passing the pre-test (phi = 0).
+*!   Implements confidence intervals for the Average Treatment Effect on the
+*!   Treated (ATT) that are asymptotically valid conditional on passing the
+*!   pre-test for parallel trends violations. This approach resolves the 
+*!   conditional coverage distortion identified by Roth (2022).
 *!
-*! Main Result (Section 5.1, Theorem 2):
-*!   Under Assumptions 1-3, the CI:
-*!     delta_bar +/- {kappa * S_pre + f(alpha, Sigma) / sqrt(n)}
-*!   achieves conditional coverage:
-*!     P(tau_bar in CI | phi = 0) >= 1 - alpha  asymptotically
+*! Theoretical Foundation:
+*!   Under the Conditional Extrapolation Assumption (Assumption 3), if the
+*!   pre-treatment severity S_pre <= M, then post-treatment violations are
+*!   bounded by S_pre. The CI accounts for both bias and sampling uncertainty.
 *!
-*! Contents:
-*!   Iterative mode: CI = delta_bar +/- {kappa*S_pre + f(alpha,Sigma)/sqrt(n)}
-*!   Overall mode:   CI = delta_bar +/- {S_pre + f(alpha,Sigma)/sqrt(n)}
-*!   Conventional:   CI = delta_bar +/- z_{1-alpha/2} * SE(delta_bar)
+*! Conditional Coverage Property (Theorem 2):
+*!   Under Assumptions 1-3 with well-separated null (s_n = omega(n^{-1/2})):
+*!     lim inf_{n -> inf} P(tau_bar in CI | phi = 0) >= 1 - alpha
+*!
+*! CI Construction:
+*!   Iterative mode: CI = delta_bar +/- {kappa * S_pre + f(alpha, Sigma)/sqrt(n)}
+*!   Overall mode:   CI = delta_bar +/- {S_pre + f(alpha, Sigma)/sqrt(n)}
+*!
+*! Width Properties (Corollary 1):
+*!   - If S_pre = O(n^{-1/2}): width = O(n^{-1/2}), same rate as conventional CI
+*!   - If S_pre = O(1): width = O(1), interval does not shrink with sample size
 *!
 *! Reference:
-*!   Mikhaeil, J.M. and C. Harshaw. 2025. "In Defense of the Pre-Test: Valid
+*!   Mikhaeil, J. M. and C. Harshaw (2025). "In Defense of the Pre-Test: Valid
 *!   Inference when Testing Violations of Parallel Trends for Difference-in-
 *!   Differences." arXiv preprint arXiv:2510.26470.
-*!   URL: https://arxiv.org/abs/2510.26470
+*!   See Section 5.1, Theorem 2; Appendix C for overall mode.
 
 version 17.0
 
 mata:
+mata set matastrict on
 
 // ============================================================================
 // ITERATIVE MODE CONFIDENCE INTERVAL
 // ============================================================================
 
 /**
- * @function _pretest_ci_iterative
  * @brief Construct conditionally valid CI for iterative violation mode
  *
- * Implements the confidence interval from Section 5.1, Theorem 2:
+ * Implements the confidence interval from Theorem 2:
  *
- *   CI = [delta_bar - h, delta_bar + h]
+ *   CI = [delta_bar_hat - h, delta_bar_hat + h]
  *
- * where the half-width h = kappa * S_pre + f(alpha, Sigma) / sqrt(n)
+ * where the half-width h = kappa * S_pre_hat + f(alpha, Sigma_hat) / sqrt(n)
  *
- * The two terms in h correspond to:
- *   - kappa * S_pre: Worst-case bias bound (Proposition 1)
- *   - f(alpha, Sigma) / sqrt(n): Statistical uncertainty from estimation
+ * The half-width consists of two components:
+ *   1. Bias adjustment: kappa * S_pre_hat bounds the worst-case bias
+ *      |tau_bar - delta_bar| <= kappa * S_pre (Proposition 1)
+ *   2. Sampling uncertainty: f(alpha, Sigma)/sqrt(n) accounts for the
+ *      statistical fluctuations in estimating delta_bar and S_pre
  *
- * @param delta_bar_hat Average post-treatment DID estimate delta_bar_hat
- * @param S_pre_hat     Estimated pre-treatment severity S_pre_hat
- * @param kappa         Bias bound constant from Proposition 1
- * @param f_alpha       Critical value f(alpha, Sigma) from Monte Carlo
- * @param n             Total sample size
+ * The constant kappa = (T_post^{-1} * sum_{t=1}^{T_post} t^q)^{1/q} where
+ * q satisfies 1/p + 1/q = 1 (Holder conjugate).
  *
- * @return Row vector (ci_lower, ci_upper), or (., .) if inputs invalid
+ * @param delta_bar_hat  Average post-treatment DID estimate
+ * @param S_pre_hat      Estimated pre-treatment severity
+ * @param kappa          Bias bound constant (depends on T_post and p)
+ * @param f_alpha        Critical value f(alpha, Sigma_hat) from Monte Carlo
+ * @param n              Total sample size
  *
- * @note This CI is only valid conditional on phi = 0 (pre-test passed)
+ * @return 1x2 row vector (ci_lower, ci_upper), or (., .) if inputs invalid
  *
+ * @note Valid only conditional on phi = 0 (pre-test passed)
  * @see Mikhaeil & Harshaw (2025), Section 5.1, Theorem 2
  */
 real rowvector _pretest_ci_iterative(real scalar delta_bar_hat,
@@ -76,7 +87,7 @@ real rowvector _pretest_ci_iterative(real scalar delta_bar_hat,
         return((., .))
     }
     
-    // Formula: half_width = κ·Ŝ_pre + f(α,Σ̂)/√n
+    // Half-width: h = kappa * S_pre_hat + f(alpha, Sigma_hat) / sqrt(n)
     half_width = kappa * S_pre_hat + f_alpha / sqrt(n)
     
     ci_lower = delta_bar_hat - half_width
@@ -91,25 +102,28 @@ real rowvector _pretest_ci_iterative(real scalar delta_bar_hat,
 // ============================================================================
 
 /**
- * @function _pretest_ci_overall
- * @brief Calculate conditionally valid CI in overall mode
+ * @brief Construct conditionally valid CI for overall violation mode
  *
- * Implements the confidence interval from Appendix C:
+ * Implements the confidence interval from Appendix C.3:
  *
- *   CI = delta_bar +/- {S_pre + f(alpha, Sigma) / sqrt(n)}
+ *   CI = [delta_bar_hat - h, delta_bar_hat + h]
  *
- * IMPORTANT: Overall mode does NOT include kappa multiplier.
+ * where the half-width h = S_pre_hat^Delta + f^Delta(alpha, Sigma^Delta) / sqrt(n)
  *
- * @param delta_bar_hat     Average post-treatment DID estimate
- * @param S_pre_hat_overall Overall mode severity estimate
- * @param f_alpha_overall   Overall mode critical value
- * @param n                 Sample size
+ * Key difference from iterative mode: The overall mode uses the severity
+ * measure based on cumulative (overall) violations nu_bar_t rather than
+ * iterative violations nu_t. The bias bound simplifies to |tau_bar - delta_bar|
+ * <= S_pre^Delta without the kappa multiplier (see Appendix C.1, Proposition).
  *
- * @return Row vector (1 x 2) containing (ci_lower, ci_upper)
+ * @param delta_bar_hat      Average post-treatment DID estimate
+ * @param S_pre_hat_overall  Overall mode severity estimate S_pre^Delta
+ * @param f_alpha_overall    Critical value f^Delta(alpha, Sigma^Delta)
+ * @param n                  Total sample size
  *
- * @note No kappa multiplier in overall mode (key difference from iterative)
+ * @return 1x2 row vector (ci_lower, ci_upper), or (., .) if inputs invalid
  *
- * @see Mikhaeil & Harshaw (2025), Appendix C
+ * @note No kappa multiplier in overall mode (fundamental distinction)
+ * @see Mikhaeil & Harshaw (2025), Appendix C.3
  */
 real rowvector _pretest_ci_overall(real scalar delta_bar_hat,
                                     real scalar S_pre_hat_overall,
@@ -129,8 +143,8 @@ real rowvector _pretest_ci_overall(real scalar delta_bar_hat,
         return((., .))
     }
     
-    // Formula: half_width = Ŝ_pre^Δ + f^Δ(α,Σ̂^Δ)/√n
-    // NOTE: NO κ multiplier in overall mode!
+    // Half-width: h = S_pre^Delta + f^Delta(alpha, Sigma^Delta) / sqrt(n)
+    // Note: No kappa multiplier in overall mode (see Appendix C.1)
     half_width = S_pre_hat_overall + f_alpha_overall / sqrt(n)
     
     ci_lower = delta_bar_hat - half_width
@@ -145,22 +159,26 @@ real rowvector _pretest_ci_overall(real scalar delta_bar_hat,
 // ============================================================================
 
 /**
- * @function _pretest_ci_conventional
- * @brief Calculate conventional DID confidence interval
+ * @brief Construct conventional DID confidence interval
  *
- * Standard CI assuming parallel trends:
+ * Standard CI under the assumption of exact parallel trends:
  *
- *   CI = delta_bar +/- z_{1-alpha/2} * SE(delta_bar)
+ *   CI = [delta_bar - z_{1-alpha/2} * SE, delta_bar + z_{1-alpha/2} * SE]
  *
- * Provided for comparison with conditionally valid intervals.
+ * This interval assumes parallel trends hold exactly (nu_t = 0 for all t),
+ * so that tau_bar = delta_bar. Provided for comparison with the conditionally
+ * valid intervals which account for potential parallel trends violations.
  *
- * @param delta_bar ATT estimate
- * @param se_delta  Standard error of ATT
- * @param alpha     Significance level (default: 0.05)
+ * Warning: This interval may suffer from coverage distortion when used after
+ * preliminary testing for parallel trends (Roth, 2022).
  *
- * @return Row vector (1 x 2) containing (ci_lower, ci_upper)
+ * @param delta_bar  DID estimate (average post-treatment ATT under PT)
+ * @param se_delta   Standard error of the DID estimate
+ * @param alpha      Significance level (default: 0.05)
  *
- * @note Uses standard normal critical value (z_{0.975} = 1.96 for alpha = 0.05)
+ * @return 1x2 row vector (ci_lower, ci_upper), or (., .) if inputs invalid
+ *
+ * @note Uses standard normal critical value z_{1-alpha/2}
  */
 real rowvector _pretest_ci_conventional(real scalar delta_bar,
                                          real scalar se_delta,
@@ -188,7 +206,7 @@ real rowvector _pretest_ci_conventional(real scalar delta_bar,
         return((., .))
     }
     
-    // Standard normal critical value: z_{1-α/2}
+    // Standard normal critical value: z_{1-alpha/2}
     z = invnormal(1 - alpha/2)
     
     ci_lower = delta_bar - z * se_delta
@@ -203,34 +221,41 @@ real rowvector _pretest_ci_conventional(real scalar delta_bar,
 // ============================================================================
 
 /**
- * @function _pretest_check
- * @brief Check if pre-test passes (extrapolation justified)
+ * @brief Evaluate the pre-test for extrapolation condition
  *
- * Evaluates the pre-test condition:
+ * Implements the preliminary test from Section 4.2:
  *
- *   phi = 1{S_pre > M}
+ *   phi = 1{S_pre_hat > M}
  *
- * @param S_pre_hat Estimated pre-treatment severity
- * @param M         Acceptable threshold
+ * The test determines whether extrapolation of parallel trends violations
+ * from pre- to post-treatment is justified. Under the Conditional
+ * Extrapolation Assumption, if S_pre <= M, then S_post <= S_pre.
  *
- * @return 1 if pre-test passes (phi = 0, S_pre <= M),
- *         0 if pre-test fails (phi = 1, S_pre > M)
+ * Theorem 1 establishes that this test is asymptotically consistent for
+ * separation s_n = omega(n^{-1/2}), meaning both Type I and Type II errors
+ * vanish as sample size grows for well-separated hypotheses.
  *
- * @note S_pre = M is considered PASS (uses <= comparison)
+ * @param S_pre_hat  Estimated pre-treatment severity
+ * @param M          Acceptable threshold for extrapolation
  *
- * @see Mikhaeil & Harshaw (2025), Section 4.2
+ * @return 1 if pre-test passes (phi = 0, S_pre_hat <= M, extrapolation valid)
+ *         0 if pre-test fails (phi = 1, S_pre_hat > M, extrapolation invalid)
+ *         . if inputs are missing
+ *
+ * @note Boundary case: S_pre_hat = M is classified as PASS
+ * @see Mikhaeil & Harshaw (2025), Section 4.2, Theorem 1
  */
 real scalar _pretest_check(real scalar S_pre_hat, real scalar M)
 {
-    // φ = 1{Ŝ_pre > M}
-    // Return: 1 if pass (φ=0), 0 if fail (φ=1)
+    // Test statistic: phi = 1{S_pre_hat > M}
+    // Return convention: 1 = pass (phi=0), 0 = fail (phi=1)
     
     if (missing(S_pre_hat) | missing(M)) {
         return(.)
     }
     
-    // S_pre ≤ M: pass (return 1)
-    // S_pre > M: fail (return 0)
+    // S_pre_hat <= M: extrapolation condition holds, return pass (1)
+    // S_pre_hat > M: extrapolation condition fails, return fail (0)
     if (S_pre_hat <= M) {
         return(1)
     } else {
@@ -244,23 +269,28 @@ real scalar _pretest_check(real scalar S_pre_hat, real scalar M)
 // ============================================================================
 
 /**
- * @function _pretest_ci
- * @brief Main CI function with pre-test condition check
+ * @brief Main interface for conditionally valid CI with pre-test check
  *
- * Primary interface for computing conditionally valid confidence intervals.
- * Checks pre-test condition first, then computes appropriate CI if passed.
+ * This is the primary function for computing confidence intervals under the
+ * conditional extrapolation framework. It first evaluates the pre-test to
+ * determine if extrapolation is justified, then computes the appropriate CI.
  *
- * @param delta_bar_hat ATT estimate
- * @param S_pre_hat     Severity estimate
- * @param M             Pre-test threshold
- * @param kappa         Time weight constant (iterative mode)
- * @param f_alpha       Adjusted critical value
- * @param n             Sample size
- * @param mode          "iterative" or "overall"
+ * Workflow:
+ *   1. Evaluate pre-test: phi = 1{S_pre_hat > M}
+ *   2. If phi = 1 (fail): return missing CI bounds
+ *   3. If phi = 0 (pass): compute CI based on specified mode
  *
- * @return Row vector (1 x 3): (ci_lower, ci_upper, pretest_passed)
- *         - pretest_passed: 1 if passed, 0 if failed
- *         - CI bounds are missing (.) if pre-test fails
+ * @param delta_bar_hat  Average post-treatment DID estimate
+ * @param S_pre_hat      Estimated pre-treatment severity
+ * @param M              Acceptable threshold for extrapolation
+ * @param kappa          Bias bound constant (used only in iterative mode)
+ * @param f_alpha        Critical value from Monte Carlo simulation
+ * @param n              Total sample size
+ * @param mode           Violation mode: "iterative" or "overall"
+ *
+ * @return 1x3 row vector: (ci_lower, ci_upper, pretest_passed)
+ *         - pretest_passed: 1 if passed, 0 if failed, . if error
+ *         - CI bounds are missing (.) if pre-test fails or on error
  *
  * @see Mikhaeil & Harshaw (2025), Section 5.1, Theorem 2
  */
@@ -275,20 +305,20 @@ real rowvector _pretest_ci(real scalar delta_bar_hat,
     real scalar pretest_passed, ci_lower, ci_upper
     real rowvector ci_result
     
-    // Check pretest: φ = 1{Ŝ_pre > M}
+    // Step 1: Evaluate pre-test phi = 1{S_pre_hat > M}
     pretest_passed = _pretest_check(S_pre_hat, M)
     
-    // If pretest failed (φ = 1), return missing values
+    // Step 2: If pre-test fails (phi = 1), extrapolation not justified
     if (pretest_passed == 0) {
         return((., ., 0))
     }
     
-    // Handle missing pretest result
+    // Handle missing pre-test result
     if (missing(pretest_passed)) {
         return((., ., .))
     }
     
-    // Pretest passed (φ = 0), compute CI based on mode
+    // Step 3: Pre-test passed (phi = 0), compute CI based on mode
     if (mode == "iterative") {
         ci_result = _pretest_ci_iterative(delta_bar_hat, S_pre_hat, 
                                           kappa, f_alpha, n)
@@ -296,7 +326,7 @@ real rowvector _pretest_ci(real scalar delta_bar_hat,
         ci_upper = ci_result[2]
     }
     else if (mode == "overall") {
-        // Overall mode: no κ multiplier
+        // Overall mode: no kappa multiplier (Appendix C)
         ci_result = _pretest_ci_overall(delta_bar_hat, S_pre_hat, 
                                         f_alpha, n)
         ci_lower = ci_result[1]
@@ -316,15 +346,17 @@ real rowvector _pretest_ci(real scalar delta_bar_hat,
 // ============================================================================
 
 /**
- * @function _pretest_ci_halfwidth_iterative
  * @brief Calculate CI half-width for iterative mode
  *
- * @param S_pre_hat Severity estimate
- * @param kappa     Time weight constant
- * @param f_alpha   Critical value
- * @param n         Sample size
+ * Computes the half-width of the conditionally valid CI:
+ *   h = kappa * S_pre_hat + f(alpha, Sigma_hat) / sqrt(n)
  *
- * @return Half-width: kappa * S_pre + f_alpha / sqrt(n)
+ * @param S_pre_hat  Estimated pre-treatment severity
+ * @param kappa      Bias bound constant from Proposition 1
+ * @param f_alpha    Critical value from Monte Carlo simulation
+ * @param n          Total sample size
+ *
+ * @return Half-width h, or missing (.) if n <= 0
  */
 real scalar _pretest_ci_halfwidth_iterative(real scalar S_pre_hat,
                                              real scalar kappa,
@@ -340,14 +372,18 @@ real scalar _pretest_ci_halfwidth_iterative(real scalar S_pre_hat,
 
 
 /**
- * @function _pretest_ci_halfwidth_overall
  * @brief Calculate CI half-width for overall mode
  *
- * @param S_pre_hat_overall Overall severity estimate
- * @param f_alpha_overall   Overall mode critical value
- * @param n                 Sample size
+ * Computes the half-width of the conditionally valid CI:
+ *   h = S_pre_hat^Delta + f^Delta(alpha, Sigma^Delta) / sqrt(n)
  *
- * @return Half-width: S_pre + f_alpha / sqrt(n) (no kappa)
+ * Note: No kappa multiplier in overall mode (Appendix C.1).
+ *
+ * @param S_pre_hat_overall  Overall mode severity estimate S_pre^Delta
+ * @param f_alpha_overall    Critical value f^Delta(alpha, Sigma^Delta)
+ * @param n                  Total sample size
+ *
+ * @return Half-width h, or missing (.) if n <= 0
  */
 real scalar _pretest_ci_halfwidth_overall(real scalar S_pre_hat_overall,
                                            real scalar f_alpha_overall,
@@ -357,7 +393,7 @@ real scalar _pretest_ci_halfwidth_overall(real scalar S_pre_hat_overall,
         return(.)
     }
     
-    // NO κ multiplier in overall mode
+    // No kappa multiplier in overall mode
     return(S_pre_hat_overall + f_alpha_overall / sqrt(n))
 }
 
@@ -367,28 +403,29 @@ real scalar _pretest_ci_halfwidth_overall(real scalar S_pre_hat_overall,
 // ============================================================================
 
 /**
- * @function _pretest_ci_results
  * @brief Comprehensive CI calculation returning all results
  *
  * Computes both conditionally valid and conventional CIs for comparison.
+ * This function facilitates the comparison illustrated in Figure 1 of the
+ * paper, where both interval types are shown side-by-side.
  *
- * @param delta_bar_hat ATT estimate
- * @param se_delta      Standard error of ATT
- * @param S_pre_hat     Severity estimate
- * @param M             Pre-test threshold
- * @param kappa         Time weight constant
- * @param f_alpha       Adjusted critical value
- * @param n             Sample size
- * @param alpha         Significance level (default: 0.05)
- * @param mode          "iterative" or "overall"
+ * @param delta_bar_hat  Average post-treatment DID estimate
+ * @param se_delta       Standard error of the DID estimate
+ * @param S_pre_hat      Estimated pre-treatment severity
+ * @param M              Acceptable threshold for extrapolation
+ * @param kappa          Bias bound constant (iterative mode only)
+ * @param f_alpha        Critical value from Monte Carlo simulation
+ * @param n              Total sample size
+ * @param alpha          Significance level (default: 0.05)
+ * @param mode           Violation mode: "iterative" or "overall"
  *
- * @return Row vector (1 x 8):
- *         [1-2] Conditional CI bounds
- *         [3]   Conditional CI half-width
- *         [4]   Pre-test passed (1/0)
- *         [5-6] Conventional CI bounds
+ * @return 1x8 row vector:
+ *         [1-2] Conditionally valid CI bounds (lower, upper)
+ *         [3]   Conditionally valid CI half-width
+ *         [4]   Pre-test result (1=passed, 0=failed)
+ *         [5-6] Conventional CI bounds (lower, upper)
  *         [7]   Conventional CI half-width
- *         [8]   Status (0=success, 1=pretest failed, -1=error)
+ *         [8]   Status code (0=success, 1=pretest failed, -1=error)
  */
 real rowvector _pretest_ci_results(real scalar delta_bar_hat,
                                     real scalar se_delta,
@@ -452,20 +489,25 @@ real rowvector _pretest_ci_results(real scalar delta_bar_hat,
 // ============================================================================
 
 /**
- * @function _pretest_ci_wrapper
- * @brief Wrapper function for ado file interface
+ * @brief Wrapper function for Stata ado file interface
  *
- * Designed to be called from Stata ado files. Parses string arguments
- * and stores results in Stata scalars.
+ * Designed to be called from Stata ado files via mata: statements.
+ * Parses string arguments to real scalars and stores results in
+ * Stata scalars for retrieval by the calling ado file.
  *
- * @param delta_bar_str ATT estimate (string)
- * @param S_pre_str     Severity estimate (string)
- * @param M_str         Pre-test threshold (string)
- * @param kappa_str     Time weight constant (string)
- * @param f_alpha_str   Critical value (string)
- * @param n_str         Sample size (string)
- * @param alpha_str     Significance level (string)
- * @param mode          "iterative" or "overall"
+ * Stored Stata scalars:
+ *   - pretest_passed: 1 if passed, 0 if failed
+ *   - ci_lower: Lower bound of CI (missing if pre-test failed)
+ *   - ci_upper: Upper bound of CI (missing if pre-test failed)
+ *
+ * @param delta_bar_str  DID estimate as string
+ * @param S_pre_str      Severity estimate as string
+ * @param M_str          Threshold as string
+ * @param kappa_str      Bias bound constant as string
+ * @param f_alpha_str    Critical value as string
+ * @param n_str          Sample size as string
+ * @param alpha_str      Significance level as string
+ * @param mode           Violation mode: "iterative" or "overall"
  */
 void _pretest_ci_wrapper(string scalar delta_bar_str,
                           string scalar S_pre_str,

@@ -19,9 +19,10 @@ inference distortions (Roth, 2022). This package provides a principled solution.
 Under the **conditional extrapolation assumption**, if pre-treatment violations
 fall below an acceptable threshold *M*, extrapolation to post-treatment is justified:
 
-> **Assumption 3 (Conditional Extrapolation):** If *S*<sub>pre</sub> ≤ *M*, then *S*<sub>post</sub> ≤ *S*<sub>pre</sub>.
+> **Assumption 3 (Conditional Extrapolation):** If *S* `<sub>`pre `</sub>` ≤ *M*, then *S* `<sub>`post `</sub>` ≤ *S* `<sub>`pre `</sub>`.
 
 The package provides:
+
 - An **asymptotically consistent pre-test** for the extrapolation condition
 - **Conditionally valid confidence intervals** for the Average Treatment Effect on the Treated (ATT) with guaranteed asymptotic coverage
 
@@ -29,22 +30,24 @@ The package provides:
 
 **Before using this package, ensure your data meets the following requirements:**
 
-| Requirement | Description |
-|:------------|:------------|
-| **Minimum 3 time periods** | *T*<sub>pre</sub> ≥ 2. At least two pre-treatment periods are required because iterative violations ν̂<sub>t</sub> are only defined for *t* ≥ 2. |
-| **Block adoption design** | All treated units must receive treatment at the same time *t*<sub>0</sub>. Staggered adoption designs are **not** supported. |
-| **Binary treatment** | Treatment indicator must be coded as 0 (control) or 1 (treated). |
-| **Complete time-group cells** | Each time period must contain observations in both treatment and control groups. |
+| Requirement                         | Description                                                                                                                                                                 |
+| :---------------------------------- | :-------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Minimum 3 time periods**    | *T* `<sub>`pre `</sub>` ≥ 2. At least two pre-treatment periods are required because iterative violations ν̂`<sub>`t `</sub>` are only defined for *t* ≥ 2. |
+| **Block adoption design**     | All treated units must receive treatment at the same time*t* `<sub>`0 `</sub>`. Staggered adoption designs are **not** supported.                               |
+| **Binary treatment**          | Treatment indicator must be coded as 0 (control) or 1 (treated).                                                                                                            |
+| **Complete time-group cells** | Each time period must contain observations in both treatment and control groups.                                                                                            |
 
 ### Data Completeness
 
 When some time periods lack observations for either group, the covariance matrix
 cannot be computed. In such cases:
-- `e(phi)` = 2 (DATA_INVALID)
+
+- `e(phi)` = . (missing, indicating data issue)
 - `e(data_valid)` = 0
 - `e(S_pre)`, `e(f_alpha)`, `e(ci_lower)`, `e(ci_upper)` will be missing (.)
 
 **Common causes:**
+
 - Missing values in treatment or outcome variables creating empty cells
 - Survey data with irregular interview schedules (e.g., `nlswork` with gaps)
 - Sample restrictions that eliminate entire time periods for one group
@@ -67,13 +70,7 @@ xtdidregress (y) (d), group(id) time(t)
 ### From GitHub
 
 ```stata
-net install pretest, from("https://raw.githubusercontent.com/kerrydu/pretest-stata/main/") replace
-```
-
-### From SSC (forthcoming)
-
-```stata
-ssc install pretest
+net install pretest, from("https://raw.githubusercontent.com/gorgeousfish/pretest/main/pretest-stata/") replace
 ```
 
 ### Local Installation
@@ -85,22 +82,15 @@ net install pretest, from("/path/to/pretest-stata/") replace
 ## Quick Start
 
 ```stata
-* Load panel data
-use mydata, clear
-xtset id time
+* Load the included example data (California Proposition 99)
+findfile prop99_smoking.dta
+use "`r(fn)'", clear
 
-* Run pre-test with threshold M = 0.5
-pretest outcome, treatment(treated) time(time) threshold(0.5) treat_time(6)
+* Set panel structure
+xtset state year
 
-* Examine results
-display "Pre-test: " cond(e(pretest_pass), "PASS", "FAIL")
-display "Severity: " %6.4f e(S_pre)
-display "Kappa: " %6.4f e(kappa)
-
-* Conditional CI (available when pre-test passes)
-if e(pretest_pass) {
-    display "Conditional CI: [" %8.4f e(ci_lower) ", " %8.4f e(ci_upper) "]"
-}
+* Run pre-test with threshold M = 5
+pretest cigsale, treatment(treated) time(year) treat_time(1989) threshold(5)
 ```
 
 ## Syntax
@@ -111,25 +101,25 @@ pretest depvar , treatment(varname) time(varname) threshold(#) [options]
 
 ### Required
 
-| Option | Description |
-|:-------|:------------|
-| `treatment(varname)` | Binary treatment indicator (0/1) |
-| `time(varname)` | Time variable |
-| `threshold(#)` | Acceptable violation threshold *M* > 0 |
+| Option                 | Description                             |
+| :--------------------- | :-------------------------------------- |
+| `treatment(varname)` | Binary treatment indicator (0/1)        |
+| `time(varname)`      | Time variable                           |
+| `threshold(#)`       | Acceptable violation threshold*M* > 0 |
 
 ### Optional
 
-| Option | Default | Description |
-|:-------|:--------|:------------|
-| `treat_time(#)` | auto | Treatment time *t*<sub>0</sub> |
-| `p(#)` | 2 | Severity norm *p* ≥ 1 |
-| `alpha(#)` | 0.05 | Significance level |
-| `level(#)` | 95 | Confidence level (%) |
-| `cluster(varname)` | — | Cluster variable for robust SE |
-| `overall` | off | Use overall violations mode |
-| `nograph` | off | Suppress event study graph |
-| `simulate(#)` | 5000 | Monte Carlo simulations |
-| `seed(#)` | 12345 | Random seed |
+| Option               | Default | Description                               |
+| :------------------- | :------ | :---------------------------------------- |
+| `treat_time(#)`    | auto    | Treatment time*t* `<sub>`0 `</sub>` |
+| `p(#)`             | 2       | Severity norm*p* ≥ 1                   |
+| `alpha(#)`         | 0.05    | Significance level                        |
+| `level(#)`         | 95      | Confidence level (%)                      |
+| `cluster(varname)` | —      | Cluster variable for robust SE            |
+| `overall`          | off     | Use overall violations mode               |
+| `nograph`          | off     | Suppress event study graph                |
+| `simulate(#)`      | 5000    | Monte Carlo simulations                   |
+| `seed(#)`          | 12345   | Random seed                               |
 
 ## Key Formulas
 
@@ -137,36 +127,40 @@ pretest depvar , treatment(varname) time(varname) threshold(#) [options]
 
 The pre-test indicator is defined as:
 
-> φ = 𝟙{*Ŝ*<sub>pre</sub> > *M*}
+> φ = 𝟙{*Ŝ* `<sub>`pre `</sub>` > *M*}
 
 where φ = 0 indicates **PASS** (extrapolation justified) and φ = 1 indicates
-**FAIL** (extrapolation rejected). This convention follows Appendix D.3.
+**FAIL** (extrapolation rejected). See Section 4.2 for the test definition.
 
 ### Average DID Estimate
 
 **Important:** The δ̄̂ reported by this package is **not** the traditional ATT.
 
-The DID estimand at time *t* is:
+The DID estimand at time *t* is defined relative to the treatment time *t* `<sub>`0 `</sub>`:
 
-> δ̂<sub>t</sub> = (ĀY<sub>t,D=1</sub> − ĀY<sub>t₀,D=1</sub>) − (ĀY<sub>t,D=0</sub> − ĀY<sub>t₀,D=0</sub>)
+> δ̂`<sub>`t `</sub>` = (Ȳ `<sub>`t,D=1 `</sub>` − Ȳ `<sub>`t₀,D=1 `</sub>`) − (Ȳ `<sub>`t,D=0 `</sub>` − Ȳ `<sub>`t₀,D=0 `</sub>`)
 
-The average is:
+where Ȳ `<sub>`t,D=d `</sub>` denotes the sample mean of outcomes for group *D* = *d* at time *t*.
 
-> δ̄̂ = (1/*T*<sub>post</sub>) × Σ<sub>t=t₀</sub><sup>T</sup> δ̂<sub>t</sub>
+The average DID estimand across post-treatment periods is:
+
+> δ̄̂ = (1/*T* `<sub>`post `</sub>`) × Σ `<sub>`t=t₀`</sub><sup>`T `</sup>` δ̂`<sub>`t `</sub>`
 
 **Key differences from traditional DID:**
 
-| Aspect | Paper's δ̄̂ | Traditional ATT |
-|:-------|:-----------|:----------------|
-| Reference point | Treatment time *t*<sub>0</sub> | Pre-treatment average |
-| δ̂<sub>t₀</sub> | Always 0 (by construction) | N/A |
-| Interpretation | Incremental change from *t*<sub>0</sub> | Total treatment effect |
+| Aspect                     | Paper's δ̄̂                                     | Traditional ATT        |
+| :------------------------- | :------------------------------------------------- | :--------------------- |
+| Reference point            | Treatment time*t* `<sub>`0 `</sub>`          | Pre-treatment average  |
+| δ̂`<sub>`t₀`</sub>` | Always 0 (by construction)                         | N/A                    |
+| Interpretation             | Incremental change from*t* `<sub>`0 `</sub>` | Total treatment effect |
 
 **Example:** If treatment effect is constant at 2.0 per period:
+
 - Traditional ATT ≈ 2.0 (total effect)
 - Paper's δ̄̂ ≈ 0 (no incremental change after t₀)
 
 **Why this definition?** The paper's δ̄̂ is designed for the conditional extrapolation framework, where:
+
 1. The CI bounds account for potential bias via κ · Ŝ_pre
 2. The interpretation is: "treatment effect relative to treatment onset"
 
@@ -174,51 +168,51 @@ For traditional ATT comparison, use `e(ci_conv_lower)` and `e(ci_conv_upper)`.
 
 ### Conditional Confidence Interval (Theorem 2)
 
-**Iterative mode:**
+**Iterative mode (Section 5.1):**
 
-> 𝓸 = δ̄̂ ± {κ · *Ŝ*<sub>pre</sub> + *f*(α, Σ̂) / √*n*}
+> *I* = δ̄̂ ± {κ · *Ŝ* `<sub>`pre `</sub>` + *f*(α, Σ̂) / √*n*}
 
 **Overall mode (Appendix C):**
 
-> 𝓸<sup>Δ</sup> = δ̄̂ ± {*Ŝ*<sup>Δ</sup><sub>pre</sub> + *f*<sup>Δ</sup>(α, Σ̂<sup>Δ</sup>) / √*n*}
+> *I* `<sup>`Δ `</sup>` = δ̄̂ ± {*Ŝ* `<sup>`Δ `</sup><sub>`pre `</sub>` + *f* `<sup>`Δ `</sup>`(α, Σ̂`<sup>`Δ `</sup>`) / √*n*}
 
-Overall mode has no κ multiplier because cumulative violations directly bound the bias.
+The overall mode has no κ multiplier because cumulative violations directly bound the bias (see Appendix C, Proposition).
 
-### κ Constant (Proposition 1)
+### κ Constant (Section 3.2, Proposition 1)
 
-> κ = (1/*T*<sub>post</sub> · Σ<sub>t=1</sub><sup>T<sub>post</sub></sup> *t*<sup>q</sup>)<sup>1/q</sup>
+> κ = ((1/*T* `<sub>`post `</sub>`) · Σ `<sub>`t=1 `</sub><sup>`T `<sub>`post `</sub></sup>` *t* `<sup>`q `</sup>`)`<sup>`1/q `</sup>`
 
-where 1/*p* + 1/*q* = 1.
+where *q* is the Hölder conjugate of *p*, i.e., 1/*p* + 1/*q* = 1.
 
 ## Stored Results
 
 ### Scalars
 
-| Result | Description |
-|:-------|:------------|
-| `e(S_pre)` | Estimated pre-treatment severity |
-| `e(kappa)` | Bias bound constant κ (iterative mode) |
-| `e(phi)` | Pre-test result (0 = pass, 1 = fail, 2 = data invalid) |
-| `e(data_valid)` | Data validity indicator |
-| `e(pretest_pass)` | Pre-test pass indicator |
-| `e(delta_bar)` | Average DID estimate |
-| `e(ci_lower)` | Conditional CI lower bound |
-| `e(ci_upper)` | Conditional CI upper bound |
-| `e(T)` | Total time periods |
-| `e(T_pre)` | Pre-treatment periods |
-| `e(T_post)` | Post-treatment periods |
-| `e(N)` | Number of observations |
+| Result              | Description                                                     |
+| :------------------ | :-------------------------------------------------------------- |
+| `e(S_pre)`        | Estimated pre-treatment severity                                |
+| `e(kappa)`        | Bias bound constant κ (iterative mode)                         |
+| `e(phi)`          | Pre-test result (0 = pass, 1 = fail, . = data issue or invalid) |
+| `e(data_valid)`   | Data validity indicator                                         |
+| `e(pretest_pass)` | Pre-test pass indicator                                         |
+| `e(delta_bar)`    | Average DID estimate                                            |
+| `e(ci_lower)`     | Conditional CI lower bound                                      |
+| `e(ci_upper)`     | Conditional CI upper bound                                      |
+| `e(T)`            | Total time periods                                              |
+| `e(T_pre)`        | Pre-treatment periods                                           |
+| `e(T_post)`       | Post-treatment periods                                          |
+| `e(N)`            | Number of observations                                          |
 
 ### Matrices
 
-| Result | Description |
-|:-------|:------------|
-| `e(nu)` | Iterative violations (*T*<sub>pre</sub>−1 × 1) |
-| `e(delta)` | DID estimates (*T*<sub>post</sub> × 1) |
-| `e(theta)` | Full parameter vector θ̂ |
-| `e(Sigma)` | Asymptotic covariance matrix |
-| `e(b)` | Coefficient vector |
-| `e(V)` | Variance matrix |
+| Result       | Description                                                  |
+| :----------- | :----------------------------------------------------------- |
+| `e(nu)`    | Iterative violations (*T* `<sub>`pre `</sub>`−1 × 1) |
+| `e(delta)` | DID estimates (*T* `<sub>`post `</sub>` × 1)          |
+| `e(theta)` | Full parameter vector θ̂                                   |
+| `e(Sigma)` | Asymptotic covariance matrix                                 |
+| `e(b)`     | Coefficient vector                                           |
+| `e(V)`     | Variance matrix                                              |
 
 ## Example
 
@@ -249,23 +243,21 @@ pretest_coverage, threshold(0.5) nsims(1000) nobs(200)
 
 ## References
 
-Mikhaeil, J. M., & Harshaw, C. (2025). In Defense of the Pre-Test: Valid
-Inference when Testing Violations of Parallel Trends for Difference-in-Differences.
-*arXiv preprint arXiv:2510.26470*. https://arxiv.org/abs/2510.26470
+Mikhaeil, J. M., & Harshaw, C. (2025). In Defense of the Pre-Test: Valid Inference When Testing Violations of Parallel Trends for Difference-in-Differences. *arXiv preprint arXiv:2510.26470*. Available at: https://arxiv.org/abs/2510.26470
 
-Rambachan, A., & Roth, J. (2023). A more credible approach to parallel trends.
-*Review of Economic Studies*, 90(5), 2555–2591.
+Rambachan, A., & Roth, J. (2023). A More Credible Approach to Parallel Trends. *Review of Economic Studies*, 90(5), 2555–2591. https://doi.org/10.1093/restud/rdad018
 
-Roth, J. (2022). Pretest with caution: Event-study estimates after testing
-for parallel trends. *American Economic Review: Insights*, 4(3), 305–322.
+Roth, J. (2022). Pretest with Caution: Event-Study Estimates after Testing for Parallel Trends. *American Economic Review: Insights*, 4(3), 305–322. https://doi.org/10.1257/aeri.20210236
 
 ## Authors
 
 **Stata Implementation:**
+
 - Xuanyu Cai
 - Wenli Xu
 
 **Methodology:**
+
 - Jonas M. Mikhaeil (Columbia University)
 - Christopher Harshaw (Columbia University)
 

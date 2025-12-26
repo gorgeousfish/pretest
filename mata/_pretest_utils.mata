@@ -1,24 +1,21 @@
-*! _pretest_utils.mata v0.1.0
-*! Utility Functions for Pretest Package
+*! _pretest_utils.mata
+*! Utility functions for the pretest package
+*!
+*! Part of pretest: Conditional Extrapolation Pre-Test for Difference-in-Differences
 *!
 *! Description:
-*!   Provides fundamental utility functions supporting the pretest Stata package.
-*!   These utilities handle numerical stability, input validation, and time
-*!   variable mapping for the conditional extrapolation pre-test framework.
+*!   Core utility functions providing numerical stability, input validation,
+*!   and time variable mapping for the conditional extrapolation framework.
 *!
-*! Functions:
-*!   _pretest_check_dim()          - Validate vector/matrix dimensions
-*!   _pretest_safe_div()           - Division with zero-denominator protection
-*!   _pretest_lp_norm()            - Normalized Lp-norm computation
-*!   _pretest_make_index_map()     - Map non-consecutive time values to indices
-*!   _pretest_find_time_index()    - Lookup consecutive index for time value
-*!   _pretest_is_consecutive()     - Test if time variable has gaps
-*!   _pretest_validate_positive()  - Validate strictly positive scalar input
-*!   _pretest_conjugate_exponent() - Compute Holder conjugate q from p
-*!
-*! Naming Convention:
-*!   All internal functions use _pretest_ prefix to avoid namespace conflicts
-*!   with user programs and other Stata packages.
+*! Contents:
+*!   _pretest_check_dim()          - Vector dimension validation
+*!   _pretest_safe_div()           - Safe division with zero-denominator handling
+*!   _pretest_lp_norm()            - Normalized Lp-norm for severity measure
+*!   _pretest_make_index_map()     - Time-to-index mapping for non-consecutive periods
+*!   _pretest_find_time_index()    - Index lookup for original time values
+*!   _pretest_is_consecutive()     - Check for gaps in time variable
+*!   _pretest_validate_positive()  - Strictly positive scalar validation
+*!   _pretest_conjugate_exponent() - Hoelder conjugate exponent computation
 *!
 *! Reference:
 *!   Mikhaeil, J. M. and C. Harshaw. 2025. In Defense of the Pre-Test: Valid
@@ -27,23 +24,25 @@
 *!   https://arxiv.org/abs/2510.26470
 
 version 17.0
+
 mata:
+mata set matastrict on
 
 // ============================================================================
 // DIMENSION VALIDATION
 // ============================================================================
 
-/**
- * @function _pretest_check_dim
- * @brief Validate vector dimensions
+/*
+ * _pretest_check_dim()
  *
- * Verifies that input vector dimension matches the expected size.
- * Used for input validation before vector operations.
+ * Validate that a column vector has the expected number of rows.
  *
- * @param v            Column vector to check
- * @param expected_dim Expected number of rows
+ * Arguments:
+ *   v            - Column vector to validate
+ *   expected_dim - Required number of rows
  *
- * @return 1 if dimension matches, 0 if mismatch (prints error message)
+ * Returns:
+ *   1 if rows(v) == expected_dim, 0 otherwise (with error message)
  */
 real scalar _pretest_check_dim(real colvector v, real scalar expected_dim) {
     if (rows(v) != expected_dim) {
@@ -58,17 +57,21 @@ real scalar _pretest_check_dim(real colvector v, real scalar expected_dim) {
 // SAFE ARITHMETIC
 // ============================================================================
 
-/**
- * @function _pretest_safe_div
- * @brief Perform safe division avoiding division by zero
+/*
+ * _pretest_safe_div()
  *
- * Returns num/denom if |denom| >= 1e-15, otherwise returns missing (.).
- * Threshold 1e-15 approximates IEEE 754 double precision machine epsilon.
+ * Perform division with protection against near-zero denominators.
  *
- * @param num   Numerator
- * @param denom Denominator
+ * Arguments:
+ *   num   - Numerator
+ *   denom - Denominator
  *
- * @return num/denom or missing (.) if denominator is near zero
+ * Returns:
+ *   num/denom if |denom| >= 1e-15, missing value (.) otherwise
+ *
+ * Note:
+ *   Threshold 1e-15 is chosen to approximate IEEE 754 double-precision
+ *   machine epsilon, preventing floating-point overflow.
  */
 real scalar _pretest_safe_div(real scalar num, real scalar denom) {
     if (abs(denom) < 1e-15) {
@@ -81,27 +84,32 @@ real scalar _pretest_safe_div(real scalar num, real scalar denom) {
 // LP NORM COMPUTATION
 // ============================================================================
 
-/**
- * @function _pretest_lp_norm
- * @brief Compute normalized Lp norm of a vector
+/*
+ * _pretest_lp_norm()
  *
- * Calculates the normalized Lp norm:
+ * Compute the normalized Lp norm of a vector.
  *
- *   ||v||_p = ((1/n) * sum(|v_i|^p))^{1/p}
+ * Implements the severity measure from Mikhaeil & Harshaw (2025), Section 3.1:
  *
- * This matches the severity measure definition in Section 3.1:
- *   S_pre = ((1/(T_pre-1)) * sum_{t=2}^{t0-1} |nu_t|^p)^{1/p}
+ *   S_pre = ( (1/(T_pre-1)) * sum_{t=2}^{t0-1} |nu_t|^p )^{1/p}
  *
- * @param v Input column vector
- * @param p Norm index (p >= 1), or missing/1e10 for L-infinity
+ * The normalized form uses mean rather than sum, making the measure
+ * comparable across different numbers of pre-treatment periods.
  *
- * @return Normalized Lp norm:
- *         - p = 1: mean absolute value
- *         - p = 2: root mean square (RMS)
- *         - p = inf: maximum absolute value
- *         - Empty vector returns 0
+ * Arguments:
+ *   v - Column vector of iterative violations (or other values)
+ *   p - Norm index, p >= 1; use missing (.) or p >= 1e10 for L-infinity
  *
- * @see Mikhaeil & Harshaw (2025), Section 3.1
+ * Returns:
+ *   Normalized Lp norm: ( mean(|v|^p) )^{1/p}
+ *     p = 1:   Mean absolute deviation
+ *     p = 2:   Root mean square
+ *     p = inf: Maximum absolute value
+ *
+ * Returns 0 for empty vector, missing (.) if p < 1.
+ *
+ * Reference:
+ *   Mikhaeil & Harshaw (2025), Section 3.1
  */
 real scalar _pretest_lp_norm(real colvector v, real scalar p) {
     real scalar n, result
@@ -109,21 +117,18 @@ real scalar _pretest_lp_norm(real colvector v, real scalar p) {
     n = rows(v)
     if (n == 0) return(0)
     
-    // Input validation: Paper requires p >= 1 (Section 3.1)
-    // Lp norm is mathematically invalid for p < 1 (violates triangle inequality)
+    // Validate p >= 1 (required for valid Lp norm; violates triangle inequality otherwise)
     if (p < 1 & p != .) {
         errprintf("Error: p must be >= 1 for valid Lp norm (got %f)\n", p)
-        errprintf("  Reference: Section 3.1, severity measure definition\n")
         return(.)
     }
     
-    // L-infinity norm special case
+    // L-infinity norm: max|v_i|
     if (p == . | p >= 1e10) {
         return(max(abs(v)))
     }
     
-    // Standard Lp norm computation
-    // (1/n * sum(|v_i|^p))^(1/p)
+    // Standard normalized Lp norm: ( (1/n) * sum(|v_i|^p) )^{1/p}
     result = (mean(abs(v):^p))^(1/p)
     
     return(result)
@@ -133,20 +138,24 @@ real scalar _pretest_lp_norm(real colvector v, real scalar p) {
 // TIME INDEX MAPPING
 // ============================================================================
 
-/**
- * @function _pretest_make_index_map
- * @brief Create time-to-index mapping for non-consecutive time values
+/*
+ * _pretest_make_index_map()
  *
- * Maps original time values to consecutive indices {1, 2, ..., T}.
- * Required when the time variable has gaps (e.g., 2000, 2002, 2004).
+ * Create a mapping from original time values to consecutive indices.
  *
- * @param orig_times Sorted unique original time values (T x 1)
+ * Panel data may have non-consecutive time values (e.g., 2000, 2002, 2004).
+ * This function creates a lookup table mapping such values to indices 1, 2, ..., T
+ * for internal computations.
  *
- * @return Matrix of dimension T x 2:
- *         - Column 1: original time values
- *         - Column 2: consecutive indices 1, 2, ..., T
+ * Arguments:
+ *   orig_times - Sorted unique time values (T x 1 column vector)
  *
- * @example Input: (2000, 2002, 2004, 2006)' -> Output: ((2000,1), (2002,2), ...)
+ * Returns:
+ *   T x 2 matrix where column 1 = original times, column 2 = indices 1..T
+ *
+ * Example:
+ *   Input:  (2000, 2002, 2004, 2006)'
+ *   Output: (2000, 1 \ 2002, 2 \ 2004, 3 \ 2006, 4)
  */
 real matrix _pretest_make_index_map(real colvector orig_times) {
     real scalar T
@@ -161,17 +170,17 @@ real matrix _pretest_make_index_map(real colvector orig_times) {
     return(index_map)
 }
 
-/**
- * @function _pretest_find_time_index
- * @brief Find consecutive index for an original time value
+/*
+ * _pretest_find_time_index()
  *
- * Looks up the consecutive index corresponding to an original time value
- * using the mapping matrix from _pretest_make_index_map().
+ * Look up the consecutive index for an original time value.
  *
- * @param index_map Mapping matrix from _pretest_make_index_map()
- * @param orig_time Original time value to look up
+ * Arguments:
+ *   index_map - Mapping matrix from _pretest_make_index_map()
+ *   orig_time - Original time value to look up
  *
- * @return Corresponding consecutive index, or missing (.) if not found
+ * Returns:
+ *   Consecutive index (1..T) if found, missing (.) if not found
  */
 real scalar _pretest_find_time_index(real matrix index_map, real scalar orig_time) {
     real scalar i, T
@@ -183,20 +192,22 @@ real scalar _pretest_find_time_index(real matrix index_map, real scalar orig_tim
         }
     }
     
-    // Not found
     return(.)
 }
 
-/**
- * @function _pretest_is_consecutive
- * @brief Check if time values form a consecutive sequence
+/*
+ * _pretest_is_consecutive()
  *
- * Determines whether time values are consecutive integers without gaps.
- * Used to decide if time-to-index mapping is needed.
+ * Check whether time values form a consecutive integer sequence.
  *
- * @param times Sorted time value column vector
+ * Used to determine if time-to-index mapping is needed. If times are
+ * consecutive (e.g., 1, 2, 3, 4), they can be used directly as indices.
  *
- * @return 1 if consecutive (no gaps), 0 if has gaps
+ * Arguments:
+ *   times - Sorted time values (column vector)
+ *
+ * Returns:
+ *   1 if consecutive (no gaps), 0 if gaps exist
  */
 real scalar _pretest_is_consecutive(real colvector times) {
     real scalar T, t_min, t_max
@@ -207,7 +218,7 @@ real scalar _pretest_is_consecutive(real colvector times) {
     t_min = min(times)
     t_max = max(times)
     
-    // If consecutive, then t_max - t_min + 1 == T
+    // Consecutive iff range equals count
     return((t_max - t_min + 1) == T)
 }
 
@@ -215,17 +226,17 @@ real scalar _pretest_is_consecutive(real colvector times) {
 // INPUT VALIDATION
 // ============================================================================
 
-/**
- * @function _pretest_validate_positive
- * @brief Validate that a scalar is positive
+/*
+ * _pretest_validate_positive()
  *
- * Checks whether the input scalar is strictly positive (> 0).
- * Prints an error message if validation fails.
+ * Validate that a scalar is strictly positive.
  *
- * @param x    Scalar to validate
- * @param name Variable name for error message
+ * Arguments:
+ *   x    - Scalar value to validate
+ *   name - Variable name for error message
  *
- * @return 1 if positive, 0 if non-positive or missing
+ * Returns:
+ *   1 if x > 0, 0 otherwise (with error message)
  */
 real scalar _pretest_validate_positive(real scalar x, string scalar name) {
     if (missing(x) | x <= 0) {
@@ -239,35 +250,41 @@ real scalar _pretest_validate_positive(real scalar x, string scalar name) {
 // CONJUGATE EXPONENT
 // ============================================================================
 
-/**
- * @function _pretest_conjugate_exponent
- * @brief Compute Holder conjugate exponent q
+/*
+ * _pretest_conjugate_exponent()
  *
- * Computes the conjugate exponent q satisfying 1/p + 1/q = 1.
- * Used in kappa constant computation (Proposition 1, Section 3.2):
+ * Compute the Hoelder conjugate exponent q from p.
  *
- *   kappa = ((1/T_post) * sum_{t=1}^{T_post} t^q)^{1/q}
+ * The conjugate exponent satisfies the Hoelder relation: 1/p + 1/q = 1.
+ * This is used in the kappa constant computation (Proposition 1):
  *
- * @param p Norm index (p >= 1)
+ *   kappa = ( (1/T_post) * sum_{t=1}^{T_post} t^q )^{1/q}
  *
- * @return Conjugate exponent q = p/(p-1):
- *         - p = 1: returns missing (.) representing infinity
- *         - p = infinity: returns 1
+ * where kappa bounds the bias |tau_bar - delta_bar| <= kappa * S_pre.
  *
- * @see Mikhaeil & Harshaw (2025), Section 3.2, Proposition 1
+ * Arguments:
+ *   p - Norm index (p >= 1)
+ *
+ * Returns:
+ *   q = p/(p-1) for p > 1
+ *   q = 1       for p = infinity (encoded as missing or >= 1e10)
+ *   q = .       for p = 1 (representing infinity)
+ *
+ * Reference:
+ *   Mikhaeil & Harshaw (2025), Section 3.2, Proposition 1
  */
 real scalar _pretest_conjugate_exponent(real scalar p) {
-    // p = infinity case
+    // p = infinity => q = 1
     if (p == . | p >= 1e10) {
         return(1)
     }
     
-    // p = 1 case
+    // p = 1 => q = infinity (represented as missing)
     if (abs(p - 1) < 1e-10) {
-        return(.)  // Represents infinity
+        return(.)
     }
     
-    // General case: q = p/(p-1)
+    // General case: q = p/(p-1) from 1/p + 1/q = 1
     return(p / (p - 1))
 }
 

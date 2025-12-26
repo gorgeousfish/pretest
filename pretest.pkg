@@ -23,7 +23,7 @@ d Requires: Stata 17.0+
 d
 d License: AGPL-3.0
 d
-d Distribution-Date: 20251221
+d Distribution-Date: 20251222
 d
 d Version: 0.1.0
 d
@@ -44,6 +44,7 @@ f ado/_pretest_parse.ado
 f ado/_pretest_output.ado
 f ado/_pretest_graph.ado
 f ado/_pretest_data_quality.ado
+f ado/_pretest_check_coverage.ado
 f mata/_pretest_estimators.mata
 f mata/_pretest_violations.mata
 f mata/_pretest_covariance.mata
@@ -53,3 +54,7 @@ f mata/_pretest_ci.mata
 f mata/_pretest_main.mata
 f mata/_pretest_simulation.mata
 f mata/_pretest_utils.mata
+f examples/organ_donations.dta
+f examples/example_organ_donations.do
+f examples/prop99_smoking.dta
+f examples/example_prop99.do

@@ -1,26 +1,45 @@
-*! _pretest_data_quality v0.1.0 - Data Quality Check Module
+*! _pretest_data_quality.ado v0.1.0
+*! Data Quality Validation for Difference-in-Differences Pre-Test Analysis
 *!
-*! Description:
-*!   Validates panel data structure and identifies potential issues
-*!   for pretest analysis.
+*! Purpose:
+*!   Validates that panel data satisfy the structural requirements for
+*!   implementing the conditional extrapolation pre-test methodology
+*!   proposed by Mikhaeil and Harshaw (2025).
+*!
+*! The validation ensures:
+*!   - Block-adoption design: binary treatment indicator D in {0,1}
+*!   - Sufficient time periods: T >= 3 (required for T_pre >= 2)
+*!   - Balanced panel structure for consistent mean estimation
+*!   - Adequate variation in treatment and outcome variables
 *!
 *! Syntax:
 *!   _pretest_data_quality outcome, treatment(varname) time(varname) [options]
 *!
+*! Required:
+*!   outcome            - Outcome variable Y_t
+*!   treatment(varname) - Binary treatment group indicator D in {0,1}
+*!   time(varname)      - Time period variable t = 1, ..., T
+*!
 *! Options:
-*!   cluster(varname)   - Cluster variable
-*!   strict             - Fail on any quality issue
-*!   noreport           - Suppress detailed report
+*!   cluster(varname)   - Clustering variable for robust inference
+*!   strict             - Fail if any quality issue is detected
+*!   noreport           - Suppress detailed diagnostic output
 *!
 *! Returns:
-*!   r(quality_passed)  - 1 if all checks passed, 0 otherwise
-*!   r(n_issues)        - Number of quality issues detected
-*!   r(balanced_panel)  - 1 if panel is balanced
-*!   r(has_variation)   - 1 if treatment has variation
+*!   r(quality_passed)  - 1 if all critical checks passed, 0 otherwise
+*!   r(n_issues)        - Count of detected quality issues
+*!   r(T)               - Number of distinct time periods
+*!   r(balanced_panel)  - 1 if panel is balanced, 0 otherwise, . if unknown
+*!   r(has_variation)   - 1 if treatment has cross-sectional variation
+*!   r(treat_rate)      - Proportion of observations in treatment group
+*!   r(n_missing)       - Count of missing values in key variables
+*!   r(n_clusters)      - Number of clusters (if cluster option specified)
 *!
 *! Reference:
-*!   Mikhaeil & Harshaw (2025), "In Defense of the Pre-Test"
-*!   arXiv:2510.26470
+*!   Mikhaeil, J. M. and C. Harshaw. 2025. In Defense of the Pre-Test:
+*!   Valid Inference when Testing Violations of Parallel Trends for
+*!   Difference-in-Differences. arXiv preprint arXiv:2510.26470.
+*!   https://arxiv.org/abs/2510.26470
 
 program define _pretest_data_quality, rclass
     version 17.0
@@ -34,19 +53,22 @@ program define _pretest_data_quality, rclass
     
     local outcome `varlist'
     
-    // Initialize issue counter
     local n_issues = 0
     local quality_passed = 1
+    local treat_rate = .
+    local is_balanced = .
     
     if "`noreport'" == "" {
         di as text _n "{hline 70}"
-        di as text "Data Quality Check for Pretest Analysis"
+        di as text "Data Quality Validation for Pre-Test Analysis"
         di as text "{hline 70}"
     }
     
-    // ========================================
-    // CHECK 1: Missing values in key variables
-    // ========================================
+    // =========================================================================
+    // CHECK 1: Missing Values
+    // Rationale: Complete cases required for consistent estimation of group
+    //            means E[Y_t | D=d] used in constructing delta_t and nu_t.
+    // =========================================================================
     if "`noreport'" == "" {
         di as text _n "CHECK 1: Missing Values"
     }
@@ -82,9 +104,13 @@ program define _pretest_data_quality, rclass
         di as text "  PASSED: No missing values in key variables"
     }
     
-    // ========================================
-    // CHECK 2: Treatment variable is binary (0/1)
-    // ========================================
+    // =========================================================================
+    // CHECK 2: Binary Treatment Indicator
+    // Rationale: The pre-test methodology assumes block-adoption design where
+    //            D in {0,1} indicates treatment group membership. This ensures
+    //            proper construction of group means for delta_t and nu_t.
+    //            See Mikhaeil & Harshaw (2025), Section 2.1.
+    // =========================================================================
     if "`noreport'" == "" {
         di as text _n "CHECK 2: Treatment Variable Binary"
     }
@@ -92,7 +118,6 @@ program define _pretest_data_quality, rclass
     quietly levelsof `treatment', local(treat_levels)
     local n_treat_levels : word count `treat_levels'
     
-    // Check if values are 0 and 1 only
     local is_binary = 1
     foreach val of local treat_levels {
         if `val' != 0 & `val' != 1 {
@@ -114,9 +139,13 @@ program define _pretest_data_quality, rclass
         di as text "  PASSED: Treatment is binary (0/1)"
     }
     
-    // ========================================
-    // CHECK 3: Treatment has variation (not all 0 or all 1)
-    // ========================================
+    // =========================================================================
+    // CHECK 3: Treatment Group Variation
+    // Rationale: Both treatment (D=1) and control (D=0) groups must have
+    //            observations to compute the DID estimand:
+    //            delta_t = E[Y_t - Y_{t0} | D=1] - E[Y_t - Y_{t0} | D=0]
+    //            See Mikhaeil & Harshaw (2025), Section 2.1.
+    // =========================================================================
     if "`noreport'" == "" {
         di as text _n "CHECK 3: Treatment Variation"
     }
@@ -134,7 +163,6 @@ program define _pretest_data_quality, rclass
         local quality_passed = 0
     }
     else {
-        // Calculate treatment rate
         quietly count if `treatment' == 1
         local n_treated = r(N)
         quietly count
@@ -148,9 +176,14 @@ program define _pretest_data_quality, rclass
         }
     }
     
-    // ========================================
-    // CHECK 4: Sufficient time periods (T >= 3)
-    // ========================================
+    // =========================================================================
+    // CHECK 4: Sufficient Time Periods (T >= 3)
+    // Rationale: The pre-test requires T_pre >= 2 to estimate at least one
+    //            iterative violation nu_t = E[Y_t - Y_{t-1} | D=1] -
+    //            E[Y_t - Y_{t-1} | D=0] for t in {2, ..., t0-1}.
+    //            With at least one post-treatment period, this requires T >= 3.
+    //            See Mikhaeil & Harshaw (2025), Section 2.1.
+    // =========================================================================
     if "`noreport'" == "" {
         di as text _n "CHECK 4: Time Periods (T >= 3 required)"
     }
@@ -171,27 +204,29 @@ program define _pretest_data_quality, rclass
         di as text "    T = " as result %3.0f `T'
     }
     
-    // ========================================
-    // CHECK 5: Panel balance check
-    // ========================================
+    // =========================================================================
+    // CHECK 5: Panel Balance
+    // Rationale: Balanced panels ensure consistent sample composition across
+    //            time periods when computing group means. Unbalanced panels
+    //            may introduce composition bias in the estimators.
+    //            The methodology assumes n_t observations per period.
+    //            See Mikhaeil & Harshaw (2025), Section 2.3.
+    // =========================================================================
     if "`noreport'" == "" {
         di as text _n "CHECK 5: Panel Balance"
     }
     
-    // Check if xtset is configured
     capture xtset
     if _rc == 0 {
         local panelvar = r(panelvar)
         local timevar = r(timevar)
         
-        // Check balance
-        quietly egen __temp_panel_count = count(`outcome'), by(`panelvar')
-        quietly summarize __temp_panel_count
+        tempvar panel_count
+        quietly egen `panel_count' = count(`outcome'), by(`panelvar')
+        quietly summarize `panel_count'
         local min_T = r(min)
         local max_T = r(max)
         local is_balanced = (`min_T' == `max_T')
-        
-        capture drop __temp_panel_count
         
         if `is_balanced' == 0 {
             local n_issues = `n_issues' + 1
@@ -213,9 +248,12 @@ program define _pretest_data_quality, rclass
         }
     }
     
-    // ========================================
-    // CHECK 6: Outcome variable variation
-    // ========================================
+    // =========================================================================
+    // CHECK 6: Outcome Variable Variation
+    // Rationale: Outcome variation is necessary for meaningful estimation of
+    //            treatment effects. A constant outcome implies tau_t = 0 for
+    //            all t, making the pre-test analysis uninformative.
+    // =========================================================================
     if "`noreport'" == "" {
         di as text _n "CHECK 6: Outcome Variable Variation"
     }
@@ -238,9 +276,14 @@ program define _pretest_data_quality, rclass
         di as text "    Std. Dev.: " as result %12.4f `outcome_sd'
     }
     
-    // ========================================
-    // CHECK 7: Cluster variable (if specified)
-    // ========================================
+    // =========================================================================
+    // CHECK 7: Cluster Variable (if specified)
+    // Rationale: Cluster-robust inference requires a sufficient number of
+    //            clusters for asymptotic validity. Standard recommendations
+    //            suggest G >= 30-50 clusters, though this is context-dependent.
+    //            With few clusters, inference may be unreliable.
+    //            See Cameron & Miller (2015) for cluster-robust inference.
+    // =========================================================================
     if "`cluster'" != "" {
         if "`noreport'" == "" {
             di as text _n "CHECK 7: Cluster Variable"
@@ -264,35 +307,39 @@ program define _pretest_data_quality, rclass
         return scalar n_clusters = `n_clusters'
     }
     
-    // ========================================
+    // =========================================================================
     // SUMMARY
-    // ========================================
+    // =========================================================================
     if "`noreport'" == "" {
         di as text _n "{hline 70}"
         di as text "SUMMARY"
         di as text "{hline 70}"
         
         if `quality_passed' == 1 & `n_issues' == 0 {
-            di as result "  All quality checks passed!"
+            di as result "  All quality checks passed."
+            di as text "  Data structure is suitable for pre-test analysis."
         }
         else if `quality_passed' == 1 {
-            di as text "  Quality check passed with " as result %2.0f `n_issues' as text " warning(s)"
+            di as text "  Quality check passed with " as result %2.0f `n_issues' as text " warning(s)."
+            di as text "  Review warnings before proceeding with analysis."
         }
         else {
-            di as error "  Quality check FAILED with " as result %2.0f `n_issues' as text " issue(s)"
+            di as error "  Quality check FAILED with " as result %2.0f `n_issues' as text " issue(s)."
+            di as text "  Address critical issues before proceeding."
         }
         
         di as text "{hline 70}"
     }
     
-    // Return results
+    // =========================================================================
+    // Return Results
+    // =========================================================================
     return scalar quality_passed = `quality_passed'
     return scalar n_issues = `n_issues'
     return scalar T = `T'
-    if "`is_balanced'" != "" {
-        return scalar balanced_panel = `is_balanced'
-    }
+    return scalar balanced_panel = `is_balanced'
     return scalar has_variation = `has_variation'
     return scalar treat_rate = `treat_rate'
     return scalar n_missing = `total_missing'
+    
 end

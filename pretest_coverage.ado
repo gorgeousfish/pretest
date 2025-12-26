@@ -174,8 +174,8 @@ program define pretest_coverage, rclass
         di as result "  ✓ Coverage target MET!"
     }
     else if !missing(`cov') {
-        di as text "  Conditional coverage rate: " as error %8.4f `cov' as text " (TARGET: ≥ 0.93)"
-        di as error "  ✗ Coverage target NOT met"
+        di as text "  Conditional coverage rate: " as text %8.4f `cov' as text " (TARGET: ≥ 0.93)"
+        di as text "  ✗ Coverage target NOT met"
     }
     else {
         di as text "  Conditional coverage rate: " as result "[No simulations passed pretest]"
@@ -200,14 +200,14 @@ program define pretest_coverage, rclass
         di as text "  Conditional coverage ≥ 93%: " as result "PASS"
     }
     else {
-        di as text "  Conditional coverage ≥ 93%: " as error "FAIL"
+        di as text "  Conditional coverage ≥ 93%: " as text "FAIL"
     }
     
     if `eff_pass' {
         di as text "  Effective reporting > 50%:  " as result "PASS"
     }
     else {
-        di as text "  Effective reporting > 50%:  " as error "FAIL"
+        di as text "  Effective reporting > 50%:  " as text "FAIL"
     }
     
     di as text "{hline 78}"

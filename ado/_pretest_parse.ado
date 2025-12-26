@@ -17,8 +17,10 @@
 *!   107 - alpha not in (0,1)
 *!
 *! Reference:
-*!   Mikhaeil & Harshaw (2025), "In Defense of the Pre-Test"
-*!   arXiv:2510.26470
+*!   Mikhaeil, J. M. and C. Harshaw. 2025. In Defense of the Pre-Test: Valid
+*!   Inference when Testing Violations of Parallel Trends for Difference-in-
+*!   Differences. arXiv preprint arXiv:2510.26470.
+*!   https://arxiv.org/abs/2510.26470
 
 program define _pretest_parse, rclass
     version 17.0

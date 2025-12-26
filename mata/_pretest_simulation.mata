@@ -1,27 +1,42 @@
-*! _pretest_simulation.mata v0.1.0
-*! Monte Carlo Simulation Framework for Coverage Validation
+*! _pretest_simulation.mata
+*! Monte Carlo Simulation Framework for Conditional Extrapolation Pre-Test
 *!
 *! Description:
-*!   Implements Monte Carlo simulation framework for validating coverage
-*!   rates of conditionally valid confidence intervals in the conditional
-*!   extrapolation pre-test framework for difference-in-differences.
+*!   Implements Monte Carlo simulation for evaluating the finite-sample properties
+*!   of conditionally valid confidence intervals under the conditional extrapolation
+*!   assumption (Assumption 3). This module follows the numerical simulation design
+*!   in Section 6 of Mikhaeil & Harshaw (2025).
+*!
+*! Simulation Design (Section 6):
+*!   The Data Generating Process (DGP) constructs populations satisfying the
+*!   conditional extrapolation assumption. For each Monte Carlo replication:
+*!     1. Generate panel data with specified violation pattern
+*!     2. Execute preliminary test (Theorem 1): phi = 1{S_hat_pre > M}
+*!     3. If phi = 0 (pass), construct CI per Theorem 2 and check coverage
+*!     4. Aggregate results to compute conditional coverage rates
+*!
+*! Key Performance Metrics:
+*!   - Conditional coverage: P(tau_bar in CI | phi = 0) should be >= 1 - alpha
+*!   - Probability of valid reporting: P(tau_bar in CI AND phi = 0)
+*!   - Pre-test pass rate: P(phi = 0)
+*!   - Mean CI width conditional on passing: E[width(CI) | phi = 0]
 *!
 *! Contents:
-*!   - Data generating process (DGP) for panel data simulation
-*!   - Single simulation run with coverage check
-*!   - Full coverage simulation study
-*!   - Violation pattern generators for simulation studies
+*!   _pretest_dgp_simulation()      - Data Generating Process for panel data
+*!   _pretest_sim_single()          - Single Monte Carlo replication
+*!   _pretest_coverage_simulation() - Full Monte Carlo simulation study
+*!   _pretest_violation_dgp()       - Violation pattern generator
 *!
 *! Reference:
-*!   Mikhaeil, J.M. and C. Harshaw. 2025. In Defense of the Pre-Test: Valid
+*!   Mikhaeil, J. M. and C. Harshaw. 2025. In Defense of the Pre-Test: Valid
 *!   Inference when Testing Violations of Parallel Trends for Difference-in-
 *!   Differences. arXiv preprint arXiv:2510.26470.
 *!   https://arxiv.org/abs/2510.26470
-*!   Section 6 (Numerical Simulations)
 
 version 17.0
 
 mata:
+mata set matastrict on
 
 // ============================================================================
 // DGP DATA GENERATION
@@ -29,38 +44,57 @@ mata:
 
 /**
  * @function _pretest_dgp_simulation
- * @brief Generate simulated panel data for coverage validation
+ * @brief Generate simulated panel data following Section 6 DGP specification
  *
- * Implements the Data Generating Process from Section 6 (Numerical Simulations):
+ * Implements the Data Generating Process from Section 6 (Numerical Simulations).
+ * The DGP is constructed to satisfy the conditional extrapolation assumption
+ * (Assumption 3) when S_pre <= M.
  *
- *   Y_it = alpha_i + beta_t + tau * D_i * post_t + nu_t * D_i * 1{t < t0} + eps_it
+ * Model Specification (Section 6):
  *
- * Model components:
- *   - alpha_i ~ N(0, sigma_alpha^2): Unit fixed effects
- *   - beta_t = t: Linear time trend
- *   - tau: True average treatment effect on the treated (ATT)
- *   - nu_t: Pre-treatment parallel trend violations
- *   - eps_it ~ N(0, sigma_eps^2): Idiosyncratic errors
+ *   Control group mean potential outcomes:
+ *     E[Y^{(0)}_t | D=0] = rho * E[Y^{(0)}_{t-1} | D=0] + alpha*t + log(T)*(cos(t) + sin(t/2))
  *
- * @param n           Number of units
- * @param T           Number of time periods
- * @param t0          Treatment time (first post-treatment period)
- * @param tau         True ATT effect
- * @param p_treat     Treatment probability (proportion treated)
- * @param nu_vec      Pre-treatment violations (T_pre-1 x 1), empty for parallel trends
- * @param sigma_alpha Std dev of unit fixed effects (default: 1)
- * @param sigma_eps   Std dev of idiosyncratic errors (default: 1)
+ *   Treatment group mean potential outcomes under control:
+ *     E[Y^{(0)}_t | D=1] = E[Y^{(0)}_t | D=0] + sum_{s=2}^{t} nu_s
+ *
+ *   Treatment group mean potential outcomes under treatment:
+ *     E[Y^{(1)}_t | D=1] = E[Y^{(0)}_t | D=1] + tau * 1{t >= t0}
+ *
+ *   Parameters from Section 6: alpha = 0.3, rho = 0.7, tau = treatment effect
+ *
+ * Sampling (Section 6):
+ *   Simulates independent draws with group-specific variances:
+ *     Y_i | D=1, t >= t0 ~ N(E[Y^{(1)}_t | D=1], sigma_1^2)
+ *     Y_i | D=1, t < t0  ~ N(E[Y^{(0)}_t | D=1], sigma_1^2)
+ *     Y_i | D=0          ~ N(E[Y^{(0)}_t | D=0], sigma_0^2)
+ *
+ *   Default parameters: sigma_1 = 2.1 (treatment), sigma_0 = 1.5 (control)
+ *
+ * Post-Treatment Violations:
+ *   This implementation sets post-treatment iterative violations to zero,
+ *   carrying forward only the cumulative pre-treatment violation. This is a
+ *   conservative design satisfying S_post = 0 <= S_pre, which is sufficient
+ *   for validating coverage properties under Assumption 3.
+ *
+ * @param n           Number of units (total sample size)
+ * @param T           Total number of time periods
+ * @param t0          Treatment time (first post-treatment period, t0 >= 2)
+ * @param tau         True average treatment effect on the treated (ATT)
+ * @param p_treat     Treatment assignment probability P(D=1)
+ * @param nu_vec      Iterative violations (nu_2, ..., nu_{t0-1})' of dim (T_pre-1) x 1
+ * @param sigma_0     Standard deviation for control group (default: 1.5)
+ * @param sigma_1     Standard deviation for treatment group (default: 2.1)
  * @param seed        Random seed for reproducibility
  *
  * @return Panel data matrix (n*T x 5):
- *         - Column 1: Y (outcome)
- *         - Column 2: D (treatment indicator)
- *         - Column 3: time (period)
- *         - Column 4: unit (unit ID)
- *         - Column 5: post (post-treatment indicator)
+ *         - Column 1: Y (observed outcome)
+ *         - Column 2: D (treatment indicator, D in {0,1})
+ *         - Column 3: time (period index, t in {1,...,T})
+ *         - Column 4: unit (unit identifier)
+ *         - Column 5: post (post-treatment indicator, 1{t >= t0})
  *
- * @note Generates balanced panel with block-adoption design
- * @note Staggered adoption not supported
+ * @note Block-adoption design only; staggered adoption not supported (Section 1.2)
  *
  * @see Mikhaeil & Harshaw (2025), Section 6
  */
@@ -70,21 +104,28 @@ real matrix _pretest_dgp_simulation(real scalar n,
                                      real scalar tau,
                                      real scalar p_treat,
                                      | real colvector nu_vec,
-                                     real scalar sigma_alpha,
-                                     real scalar sigma_eps,
+                                     real scalar sigma_0,
+                                     real scalar sigma_1,
                                      real scalar seed)
 {
     real scalar i, t, idx, T_pre, n_treat
-    real colvector alpha, D, eps_i
+    real colvector D, nubar_vec
     real matrix data
-    real scalar Y_it, post_t, nu_t
+    real scalar Y_it, post_t, nubar_t
     
-    // Default parameters
-    if (args() < 7 | missing(sigma_alpha)) {
-        sigma_alpha = 1
+    // ========================================
+    // Model parameters (Section 6)
+    // ========================================
+    real scalar rho, alpha_coef
+    rho = 0.7           // Autoregressive coefficient
+    alpha_coef = 0.3    // Linear time trend coefficient
+    
+    // Default sampling parameters (Section 6)
+    if (args() < 7 | missing(sigma_0)) {
+        sigma_0 = 1.5   // Control group standard deviation
     }
-    if (args() < 8 | missing(sigma_eps)) {
-        sigma_eps = 1
+    if (args() < 8 | missing(sigma_1)) {
+        sigma_1 = 2.1   // Treatment group standard deviation
     }
     if (args() < 9 | missing(seed)) {
         seed = 12345
@@ -96,7 +137,7 @@ real matrix _pretest_dgp_simulation(real scalar n,
     // Pre-treatment periods
     T_pre = t0 - 1
     
-    // Default: no violations (parallel trends)
+    // Default: no violations (parallel trends hold)
     if (args() < 6 | rows(nu_vec) == 0) {
         nu_vec = J(T_pre - 1, 1, 0)
     }
@@ -108,54 +149,137 @@ real matrix _pretest_dgp_simulation(real scalar n,
         return(J(0, 5, .))
     }
     
-    // Generate unit fixed effects: α_i ~ N(0, σ_α²)
-    alpha = rnormal(n, 1, 0, sigma_alpha)
+    // ========================================
+    // Pre-compute control group means (Section 6)
+    // ========================================
+    // E[Y^{(0)}_t | D=0] = rho * E[Y^{(0)}_{t-1} | D=0] + alpha*t + log(T)*(cos(t) + sin(t/2))
+    //
+    // This is an AR(1) process with time-varying deterministic trend.
+    // Recursive computation starting from E[Y^{(0)}_0 | D=0] = 0.
+    real colvector mu_control
+    mu_control = J(T, 1, 0)
     
+    for (t = 1; t <= T; t++) {
+        real scalar prev_mu, nonlinear_trend
+        
+        // Previous period mean
+        if (t == 1) {
+            prev_mu = 0
+        }
+        else {
+            prev_mu = mu_control[t - 1]
+        }
+        
+        // Nonlinear time trend component
+        nonlinear_trend = ln(T) * (cos(t) + sin(t / 2))
+        
+        // AR(1) process with deterministic trend
+        mu_control[t] = rho * prev_mu + alpha_coef * t + nonlinear_trend
+    }
+    
+    // ========================================
+    // Pre-compute cumulative violations (Section 2.1)
+    // ========================================
+    // nubar_t = sum_{s=2}^{t} nu_s represents the overall (cumulative) violation
+    // at period t. The treatment group mean under control is:
+    //   E[Y^{(0)}_t | D=1] = E[Y^{(0)}_t | D=0] + nubar_t
+    nubar_vec = runningsum(nu_vec)
+    
+    // ========================================
     // Generate treatment assignment
+    // ========================================
     D = J(n, 1, 0)
     n_treat = round(n * p_treat)
     
-    // Randomly select treated units
+    // Assign first n_treat units to treatment
     for (i = 1; i <= n_treat; i++) {
         D[i] = 1
     }
-    // Shuffle treatment assignment
+    // Shuffle treatment assignment randomly
     D = D[jumble(range(1, n, 1)),]
     
-    // Initialize data matrix: [Y, D, time, unit, post]
+    // ========================================
+    // Initialize data matrix
+    // ========================================
+    // Columns: [Y, D, time, unit, post]
     data = J(n * T, 5, .)
     
-    // Generate panel data
+    // ========================================
+    // Generate panel data (Section 6)
+    // ========================================
     idx = 0
     for (i = 1; i <= n; i++) {
-        // Generate idiosyncratic errors for unit i
-        eps_i = rnormal(T, 1, 0, sigma_eps)
-        
         for (t = 1; t <= T; t++) {
             idx = idx + 1
             
-            // Post-treatment indicator
+            // Post-treatment indicator: 1{t >= t0}
             post_t = (t >= t0 ? 1 : 0)
             
-            // Violation component for treated units in pre-treatment periods
-            // ν_t applies to periods t = 2, ..., t0-1
-            if (D[i] == 1 & t >= 2 & t <= T_pre) {
-                nu_t = nu_vec[t - 1]  // nu_vec[1] = ν_2, etc.
+            // ----------------------------------------
+            // Step 1: Get control group mean for period t
+            // ----------------------------------------
+            real scalar mu_0t
+            mu_0t = mu_control[t]
+            
+            // ----------------------------------------
+            // Step 2: Compute cumulative violation for treated group
+            // ----------------------------------------
+            // nubar_t = sum_{s=2}^{t} nu_s (overall violation at period t)
+            //
+            // Index mapping:
+            //   t = 1:                nubar_1 = 0 (no violation defined)
+            //   t in {2,...,T_pre}:   nubar_t = nubar_vec[t-1]
+            //   t > T_pre:            nubar_t = nubar_vec[T_pre-1] (carry forward)
+            //
+            // Note: Post-treatment periods carry forward the final pre-treatment
+            // cumulative violation, implying zero post-treatment iterative violations.
+            if (t == 1) {
+                nubar_t = 0
+            }
+            else if (t <= T_pre) {
+                nubar_t = nubar_vec[t - 1]
             }
             else {
-                nu_t = 0
+                // Carry forward: S_post = 0 <= S_pre (conservative for coverage)
+                nubar_t = nubar_vec[T_pre - 1]
             }
             
-            // Generate outcome
-            // Y_it = α_i + β_t + τ × D_i × post_t + ν_t × D_i + ε_it
-            Y_it = alpha[i] + t + tau * D[i] * post_t + nu_t * D[i] + eps_i[t]
+            // ----------------------------------------
+            // Step 3: Generate outcome based on treatment status
+            // ----------------------------------------
+            real scalar mu_it, sigma_it
             
-            // Store in data matrix
-            data[idx, 1] = Y_it       // Y
-            data[idx, 2] = D[i]       // D (treatment)
-            data[idx, 3] = t          // time
-            data[idx, 4] = i          // unit_id
-            data[idx, 5] = post_t     // post
+            if (D[i] == 0) {
+                // Control group: Y_i ~ N(E[Y^{(0)}_t | D=0], sigma_0^2)
+                mu_it = mu_0t
+                sigma_it = sigma_0
+            }
+            else {
+                // Treatment group
+                if (t >= t0) {
+                    // Post-treatment: Y_i ~ N(E[Y^{(1)}_t | D=1], sigma_1^2)
+                    // where E[Y^{(1)}_t | D=1] = E[Y^{(0)}_t | D=0] + nubar_t + tau
+                    mu_it = mu_0t + nubar_t + tau
+                }
+                else {
+                    // Pre-treatment: Y_i ~ N(E[Y^{(0)}_t | D=1], sigma_1^2)
+                    // where E[Y^{(0)}_t | D=1] = E[Y^{(0)}_t | D=0] + nubar_t
+                    mu_it = mu_0t + nubar_t
+                }
+                sigma_it = sigma_1
+            }
+            
+            // Draw from normal distribution
+            Y_it = rnormal(1, 1, mu_it, sigma_it)
+            
+            // ----------------------------------------
+            // Step 4: Store in data matrix
+            // ----------------------------------------
+            data[idx, 1] = Y_it       // Y (observed outcome)
+            data[idx, 2] = D[i]       // D (treatment indicator)
+            data[idx, 3] = t          // time (period index)
+            data[idx, 4] = i          // unit (unit identifier)
+            data[idx, 5] = post_t     // post (post-treatment indicator)
         }
     }
     
@@ -169,31 +293,46 @@ real matrix _pretest_dgp_simulation(real scalar n,
 
 /**
  * @function _pretest_sim_single
- * @brief Execute single simulation replication and evaluate coverage
+ * @brief Execute single Monte Carlo replication with coverage evaluation
  *
- * Generates one dataset, runs the pre-test procedure, and checks whether
- * the resulting confidence interval covers the true ATT.
+ * Generates one dataset from the DGP, executes the preliminary test (Theorem 1),
+ * constructs the conditionally valid confidence interval (Theorem 2), and
+ * evaluates coverage. This function implements one iteration of the Monte Carlo
+ * simulation study described in Section 6.
  *
- * @param tau      True ATT effect
- * @param n        Number of units
- * @param T        Number of time periods
- * @param t0       Treatment time (first post-treatment period)
- * @param p_treat  Treatment probability
- * @param nu_vec   Pre-treatment violations (T_pre-1 x 1)
- * @param M        Pre-test threshold
- * @param p_norm   Severity norm index (p >= 1)
- * @param alpha    Significance level
- * @param mode     "iterative" or "overall"
- * @param S_sims   Monte Carlo simulations for critical value
- * @param seed     Random seed for this replication
+ * Algorithm:
+ *   1. Generate panel data from DGP with specified violations
+ *   2. Estimate theta = (nu_2,...,nu_{t0-1}, delta_{t0},...,delta_T)'
+ *   3. Compute S_hat_pre = severity(nu_hat, p) (Section 4.2)
+ *   4. Execute preliminary test: phi = 1{S_hat_pre > M} (Theorem 1)
+ *   5. If phi = 0 (pass):
+ *      a. Compute kappa (Proposition 1) and f(alpha, Sigma) (Section 5.1)
+ *      b. Construct CI per Theorem 2
+ *      c. Check if tau_bar in CI
+ *   6. Return coverage indicator and diagnostics
+ *
+ * @param tau       True ATT (tau_bar)
+ * @param n         Number of units
+ * @param T         Total number of time periods
+ * @param t0        Treatment time (first post-treatment period)
+ * @param p_treat   Treatment assignment probability P(D=1)
+ * @param nu_vec    True iterative violations (T_pre-1 x 1)
+ * @param M         Acceptable threshold for pre-test (Section 3.1)
+ * @param p_norm    Lp-norm index for severity measure (p >= 1)
+ * @param alpha     Significance level (e.g., 0.05 for 95% CI)
+ * @param mode      Violation mode: "iterative" or "overall" (Appendix C)
+ * @param S_sims    Monte Carlo simulations for critical value f(alpha, Sigma)
+ * @param seed      Random seed for reproducibility
  *
  * @return Row vector (1 x 6):
- *         - [1] covers: 1 if CI contains true tau, 0 otherwise, . if pretest fails
- *         - [2] phi: pre-test result (0 = pass, 1 = fail)
- *         - [3] ci_lower: CI lower bound (. if pretest fails)
- *         - [4] ci_upper: CI upper bound (. if pretest fails)
- *         - [5] delta_bar: ATT estimate
- *         - [6] S_pre: severity estimate
+ *         [1] covers:    1 if tau_bar in CI, 0 otherwise, missing if phi=1
+ *         [2] phi:       Pre-test result (0 = pass, 1 = fail)
+ *         [3] ci_lower:  CI lower bound (missing if phi=1)
+ *         [4] ci_upper:  CI upper bound (missing if phi=1)
+ *         [5] delta_bar: Average post-treatment DID estimate
+ *         [6] S_pre:     Estimated pre-treatment severity
+ *
+ * @see Mikhaeil & Harshaw (2025), Theorems 1-2, Section 6
  */
 real rowvector _pretest_sim_single(real scalar tau,
                                    real scalar n,
@@ -215,8 +354,8 @@ real rowvector _pretest_sim_single(real scalar tau,
     real scalar T_pre, T_post, overall_flag
     real rowvector ci_result
     
-    // Generate data
-    data = _pretest_dgp_simulation(n, T, t0, tau, p_treat, nu_vec, 1, 1, seed)
+    // Generate data using default parameters from Section 6
+    data = _pretest_dgp_simulation(n, T, t0, tau, p_treat, nu_vec, 1.5, 2.1, seed)
     
     Y = data[., 1]
     D = data[., 2]
@@ -229,9 +368,8 @@ real rowvector _pretest_sim_single(real scalar tau,
     delta_vec = _pretest_did_vector(Y, D, time_vec, t0, T)
     delta_bar = _pretest_did_avg(delta_vec)
     
-    // Compute violations
-    // Use _pretest_nu_vector for iterative violations
-    // Use _pretest_nu_to_nubar for overall (cumulative) violations
+    // Estimate iterative violations nu_hat = (nu_hat_2, ..., nu_hat_{t0-1})'
+    // and overall violations nubar_hat (Appendix C)
     nu_est = _pretest_nu_vector(Y, D, time_vec, t0)
     nubar_est = _pretest_nu_to_nubar(nu_est)
     
@@ -248,7 +386,7 @@ real rowvector _pretest_sim_single(real scalar tau,
         S_pre = _pretest_severity(nu_est, p_norm)
     }
     
-    // Compute kappa: _pretest_kappa(T_post, p, overall_mode)
+    // Compute kappa constant (Proposition 1, Section 3.2)
     kappa = _pretest_kappa(T_post, p_norm, overall_flag)
     
     // Compute critical value
@@ -263,7 +401,7 @@ real rowvector _pretest_sim_single(real scalar tau,
                                           T_pre, T_post, p_norm, kappa, 0, seed + 1000)
     }
     
-    // Pretest check
+    // Execute preliminary test (Theorem 1): phi = 1{S_hat_pre > M}
     phi = _pretest_test(S_pre, M)
     
     // Compute CI if pretest passes
@@ -296,36 +434,48 @@ real rowvector _pretest_sim_single(real scalar tau,
 
 /**
  * @function _pretest_coverage_simulation
- * @brief Execute full Monte Carlo coverage simulation study
+ * @brief Execute full Monte Carlo study for coverage validation
  *
- * Runs multiple simulation replications to evaluate the conditional
- * coverage properties of the pre-test confidence intervals.
+ * Runs multiple independent simulation replications to evaluate the finite-sample
+ * properties of the conditionally valid confidence intervals under Assumption 3:
  *
- * @param n_sims    Number of simulation replications
- * @param tau       True ATT effect
- * @param n         Number of units per simulation
- * @param T         Number of time periods
+ *   1. Conditional coverage (Theorem 2): P(tau_bar in CI | phi = 0)
+ *   2. Probability of valid reporting (Theorem 3): P(tau_bar in CI AND phi = 0)
+ *   3. Pre-test pass rate: P(phi = 0)
+ *
+ * Theoretical Properties (Theorems 2-3):
+ *   Under Assumption 3 with well-separated null (|S_pre - M| = omega(n^{-1/2})):
+ *     - Conditional coverage >= 1 - alpha asymptotically
+ *     - Probability of valid reporting >= 1 - alpha asymptotically
+ *
+ * @param n_sims    Number of Monte Carlo replications (5000 used in Section 6)
+ * @param tau       True ATT (tau_bar)
+ * @param n         Number of units per replication
+ * @param T         Total number of time periods
  * @param t0        Treatment time (first post-treatment period)
- * @param p_treat   Treatment probability
- * @param nu_vec    Pre-treatment violations (T_pre-1 x 1)
- * @param M         Pre-test threshold
- * @param p_norm    Severity norm index (p >= 1)
- * @param alpha     Significance level
- * @param mode      "iterative" or "overall"
- * @param S_sims    Monte Carlo simulations for critical value (per replication)
- * @param base_seed Base random seed
+ * @param p_treat   Treatment assignment probability P(D=1)
+ * @param nu_vec    True iterative violations (T_pre-1 x 1)
+ * @param M         Acceptable threshold for pre-test (Section 3.1)
+ * @param p_norm    Lp-norm index for severity measure (p >= 1)
+ * @param alpha     Significance level (e.g., 0.05)
+ * @param mode      Violation mode: "iterative" or "overall" (Appendix C)
+ * @param S_sims    MC simulations for f(alpha, Sigma) per replication
+ * @param base_seed Base random seed (replication i uses seed = base_seed + i)
  *
  * @return Row vector (1 x 6):
- *         - [1] coverage_rate: Conditional coverage P(tau in CI | pretest passed)
- *         - [2] pass_rate: Proportion of replications where pretest passed
- *         - [3] effective_coverage: pass_rate * coverage_rate
- *         - [4] n_passed: Number of replications where pretest passed
- *         - [5] n_sims: Total replications run
- *         - [6] mean_ci_width: Average CI width among passed replications
+ *         [1] coverage_rate:      P(tau in CI | phi=0) (conditional coverage)
+ *         [2] pass_rate:          P(phi=0) (pre-test pass probability)
+ *         [3] effective_coverage: P(tau in CI AND phi=0) (valid reporting)
+ *         [4] n_passed:           Number of replications with phi=0
+ *         [5] n_sims:             Total replications executed
+ *         [6] mean_ci_width:      E[width(CI) | phi=0]
  *
- * @note Target conditional coverage: >= 1 - alpha (accounting for MC error)
+ * Interpretation:
+ *   - coverage_rate should be >= 1-alpha (e.g., >= 0.95 for alpha=0.05)
+ *   - pass_rate depends on |S_pre - M| and sample size n
+ *   - MC standard error: sqrt(coverage_rate*(1-coverage_rate)/n_passed)
  *
- * @see Mikhaeil & Harshaw (2025), Section 6
+ * @see Mikhaeil & Harshaw (2025), Section 6, Figure 3
  */
 real rowvector _pretest_coverage_simulation(real scalar n_sims,
                                             real scalar tau,
@@ -387,6 +537,7 @@ real rowvector _pretest_coverage_simulation(real scalar n_sims,
     }
     
     pass_rate = n_passed / n_sims
+    // P(tau in CI AND phi=0) = P(tau in CI | phi=0) * P(phi=0)
     effective_coverage = pass_rate * coverage_rate
     
     return((coverage_rate, pass_rate, effective_coverage, n_passed, n_sims, mean_width))
@@ -399,19 +550,31 @@ real rowvector _pretest_coverage_simulation(real scalar n_sims,
 
 /**
  * @function _pretest_violation_dgp
- * @brief Generate structured violation patterns for DGP
+ * @brief Generate structured iterative violation patterns for simulation
  *
- * Creates predefined violation patterns for simulation studies.
+ * Creates predefined violation patterns (nu_2, ..., nu_{t0-1}) for Monte Carlo
+ * studies. These patterns facilitate investigation of CI properties under
+ * various departures from parallel trends.
  *
- * @param T_pre   Number of pre-treatment periods
- * @param pattern Violation pattern:
- *                - "zero": no violations (parallel trends)
- *                - "constant": constant violation at each period
- *                - "linear": linearly increasing violations
- *                - "quadratic": quadratically increasing violations
- * @param scale   Scale factor for violation magnitudes
+ * Violation Semantics (Section 2.1):
+ *   The returned vector represents iterative violations:
+ *     nu_t = E[Y^{(0)}_t - Y^{(0)}_{t-1} | D=1] - E[Y^{(0)}_t - Y^{(0)}_{t-1} | D=0]
+ *   Cumulative (overall) violations are: nubar_t = sum_{s=2}^{t} nu_s
  *
- * @return Violation vector of dimension (T_pre-1) x 1
+ * @param T_pre   Number of pre-treatment periods (T_pre = t0 - 1)
+ * @param pattern Violation pattern type:
+ *                - "zero":      nu_t = 0 for all t (exact parallel trends)
+ *                - "constant":  nu_t = scale for all t (uniform deviation)
+ *                - "linear":    nu_t = scale * t / (T_pre-1) (increasing)
+ *                - "quadratic": nu_t = scale * (t / (T_pre-1))^2 (accelerating)
+ * @param scale   Magnitude scaling factor
+ *
+ * @return Iterative violation vector (nu_2, ..., nu_{t0-1})' of dim (T_pre-1) x 1
+ *
+ * @note For nonlinear patterns as in Section 6, construct nu_vec directly
+ *       using the scaling approach described therein.
+ *
+ * @see Mikhaeil & Harshaw (2025), Section 6
  */
 real colvector _pretest_violation_dgp(real scalar T_pre,
                                        string scalar pattern,

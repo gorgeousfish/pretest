@@ -1,58 +1,50 @@
-*! _pretest_mata.do v0.1.0
-*! Mata Library Loader for pretest Package
+*! _pretest_mata.do
+*! Mata Library Loader for the pretest Package
+*! Version: 0.1.0
 *!
-*! Description:
+*! Purpose:
 *!   Loads all Mata functions required by the pretest command.
-*!   Automatically called by pretest.ado or can be run manually.
+*!   This script is automatically invoked by pretest.ado or can be
+*!   executed manually for development and testing purposes.
 *!
 *! Usage:
-*!   . do _pretest_mata.do
+*!   do _pretest_mata.do
 *!
 *! Reference:
-*!   Mikhaeil, J.M. and C. Harshaw. 2025. In Defense of the Pre-Test.
-*!   arXiv:2510.26470. https://arxiv.org/abs/2510.26470
+*!   Mikhaeil, J. M. and C. Harshaw. 2025. In Defense of the Pre-Test:
+*!   Valid Inference when Testing Violations of Parallel Trends for
+*!   Difference-in-Differences. arXiv preprint arXiv:2510.26470.
+*!   https://arxiv.org/abs/2510.26470
 
 version 17.0
 
-// Display loading status
+// Display initialization status
 di as text "{hline 60}"
-di as text "Loading pretest Mata library..."
+di as text "Initializing pretest Mata library..."
 di as text "{hline 60}"
 
-// Clear any existing definitions to avoid conflicts
+// Clear existing Mata function definitions to prevent version conflicts
 capture noisily mata: mata drop _pretest_*()
 
-// ============================================================
-// Load Mata source files (in dependency order)
-// Uses findfile for compatibility with Stata's installation structure
-// ============================================================
+// ============================================================================
+// Mata Source File Loader
+// ----------------------------------------------------------------------------
+// Loads Mata source files in dependency order using multiple search strategies
+// for compatibility with Stata's package installation conventions.
+// ============================================================================
 
-// Helper program: locate and execute Mata files
-// Priority: (0) adopath search, (1) mata/ subdirectory via c(filename), 
-// (2) findfile this script, (3) findfile the target file directly
+// Helper program: Locate and execute Mata source files
+// Search priority:
+//   1. mata/ subdirectory relative to c(filename)
+//   2. mata/ subdirectory relative to findfile result for this script
+//   3. Direct findfile search for the target file
+//   4. mata/ subdirectory relative to pretest.ado location
+//   5. Standard sysdir locations (PLUS, PERSONAL, SITE)
 capture program drop _pretest_load_mata
 program define _pretest_load_mata
     args filename
     
-    // Method 0 (NEW): Search adopath for mata/ subdirectory
-    // This ensures development directory takes precedence when added to adopath
-    local adopaths : adopath
-    local word_count : word count `adopaths'
-    forvalues i = 1/`word_count' {
-        local apath : word `i' of `adopaths'
-        // Skip system paths
-        if strpos("`apath'", "(") > 0 continue
-        // Check for mata subdirectory
-        local matapath "`apath'/mata/`filename'"
-        capture confirm file "`matapath'"
-        if _rc == 0 {
-            quietly do "`matapath'"
-            di as text "  [OK] `filename' loaded from adopath mata/"
-            exit
-        }
-    }
-    
-    // Method 1: Locate via current script directory (c(filename))
+    // Strategy 1: Locate via current script directory (c(filename))
     local thisfile "`c(filename)'"
     if "`thisfile'" != "" {
         local basedir = subinstr("`thisfile'", "_pretest_mata.do", "", .)
@@ -65,7 +57,7 @@ program define _pretest_load_mata
         }
     }
     
-    // Method 2: Locate via findfile on this script
+    // Strategy 2: Locate via findfile on this loader script
     capture findfile _pretest_mata.do
     if _rc == 0 {
         local basedir = subinstr("`r(fn)'", "_pretest_mata.do", "", .)
@@ -78,7 +70,7 @@ program define _pretest_load_mata
         }
     }
     
-    // Method 3: Direct findfile on target file
+    // Strategy 3: Direct findfile search for target file
     capture findfile `filename'
     if _rc == 0 {
         quietly do "`r(fn)'"
@@ -86,7 +78,7 @@ program define _pretest_load_mata
         exit
     }
     
-    // Method 4: Search via findfile on pretest.ado then look in sibling mata/
+    // Strategy 4: Locate via pretest.ado sibling mata/ directory
     capture findfile pretest.ado
     if _rc == 0 {
         local adomatch "`r(fn)'"
@@ -100,7 +92,7 @@ program define _pretest_load_mata
         }
     }
     
-    // Method 5: Search via sysdir standard locations
+    // Strategy 5: Search standard Stata system directories
     foreach sdir in PLUS PERSONAL SITE {
         local sysdir : sysdir `sdir'
         if "`sysdir'" != "" {
@@ -120,43 +112,47 @@ program define _pretest_load_mata
     exit 601
 end
 
-// 1. Utility functions (no dependencies)
+// ----------------------------------------------------------------------------
+// Load Mata modules in dependency order
+// ----------------------------------------------------------------------------
+
+// 1. Utility functions: Matrix operations, numerical helpers (no dependencies)
 _pretest_load_mata _pretest_utils.mata
 
-// 2. DID estimator functions
+// 2. DID estimators: delta_t computation per Section 2.1
 _pretest_load_mata _pretest_estimators.mata
 
-// 3. Violation estimation functions
+// 3. Violation estimators: nu_t and S_pre per Section 3.1
 _pretest_load_mata _pretest_violations.mata
 
-// 4. Covariance matrix estimation
+// 4. Covariance estimation: Sigma matrix per Assumption 2
 _pretest_load_mata _pretest_covariance.mata
 
-// 5. Kappa constant computation
+// 5. Kappa computation: Bias bound constant per Proposition 1
 _pretest_load_mata _pretest_kappa.mata
 
-// 6. Psi function and Monte Carlo critical values
+// 6. Psi function: Critical value computation per Section 5.1
 _pretest_load_mata _pretest_psi.mata
 
-// 7. Confidence interval functions
+// 7. Confidence intervals: Implementation of Theorem 2
 _pretest_load_mata _pretest_ci.mata
 
-// 8. Coverage simulation functions (optional)
+// 8. Simulation module: Coverage analysis (optional, for development)
 capture _pretest_load_mata _pretest_simulation.mata
 if _rc {
-    di as text "  [!] _pretest_simulation.mata not found (optional)"
+    di as text "  [!] _pretest_simulation.mata not loaded (optional module)"
 }
 
-// 9. Main computation function
+// 9. Main computation: Orchestrates full pretest analysis
 _pretest_load_mata _pretest_main.mata
 
-// Clean up helper program
+// Clean up temporary helper program
 capture program drop _pretest_load_mata
 
-// ============================================================
-// Complete
-// ============================================================
+// ============================================================================
+// Initialization Complete
+// ============================================================================
 
 di as text "{hline 60}"
-di as text "pretest Mata library loaded successfully"
+di as text "pretest Mata library initialized successfully."
 di as text "{hline 60}"

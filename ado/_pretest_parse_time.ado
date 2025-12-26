@@ -1,37 +1,46 @@
-*! _pretest_parse_time v0.1.0 - Time Structure Parsing Module
+*! _pretest_parse_time.ado
+*! version 0.1.0
 *!
-*! Description:
-*!   Parses time variable structure and computes key time parameters.
-*!   - T (total periods): Number of unique time values in data
-*!   - t0 (treatment time): First post-treatment period
-*!   - T_pre (pre-treatment periods): t0 - 1, periods t ∈ {1, ..., t0-1}
-*!   - T_post (post-treatment periods): T - T_pre, periods t ∈ {t0, ..., T}
+*! Time structure parsing for the pretest package.
+*!
+*! This module parses the time variable and computes key temporal parameters
+*! required for the pretest methodology:
+*!
+*!   T      - Total number of time periods (unique values in timevar)
+*!   t0     - Treatment time: first post-treatment period
+*!   T_pre  - Number of pre-treatment periods: t0 - 1
+*!   T_post - Number of post-treatment periods: T - T_pre
+*!
+*! The time index is normalized to consecutive integers 1, 2, ..., T internally,
+*! regardless of the original time values in the data.
 *!
 *! Syntax:
 *!   _pretest_parse_time timevar [, treatment(varname) treat_time(#) is_panel(#)]
 *!
 *! Options:
-*!   treatment()  - Treatment variable (for inferring t0 from time-varying treatment)
-*!   treat_time() - User-specified treatment time (highest priority)
-*!   is_panel()   - Panel data indicator (0/1)
+*!   treatment()  - Treatment indicator variable (for inferring t0)
+*!   treat_time() - User-specified treatment time (takes precedence)
+*!   is_panel()   - Panel data indicator (0 = repeated cross-sections, 1 = panel)
 *!
-*! Error codes:
-*!   100 - Required parameter missing (treat_time not specified for repeated cross-section)
-*!   104 - T_pre < 2 (at least 2 pre-treatment periods required)
-*!   109 - treat_time outside data time range
+*! Exit codes:
+*!   100 - Treatment time not specified and cannot be inferred
+*!   104 - Insufficient pre-treatment periods (T_pre < 2)
+*!   109 - Specified treatment time not found in data
 *!
 *! Reference:
-*!   Mikhaeil & Harshaw (2025), Section 2.1
-*!   - T periods indexed t = 1, ..., T
-*!   - t0 is the time at which treatment was administered
-*!   - T_pre = t0 - 1 is the number of pre-treatment periods
-*!   - T_post = T - T_pre is the number of post-treatment periods
-*!   - Requires T_pre >= 2 (iterative violation nu_t only defined for t >= 2)
+*!   Mikhaeil, J. M. and C. Harshaw. 2025. In Defense of the Pre-Test: Valid
+*!   Inference when Testing Violations of Parallel Trends for Difference-in-
+*!   Differences. arXiv preprint arXiv:2510.26470.
+*!   https://arxiv.org/abs/2510.26470
+*!
+*!   Section 2.1: The analyst works with T time periods indexed t = 1, ..., T.
+*!   Treatment is administered at t0, with T_pre = t0 - 1 pre-treatment periods.
+*!   The methodology requires T_pre >= 2 for the iterative violations to be
+*!   well-defined.
 
 program define _pretest_parse_time, rclass
     version 17.0
     
-    // Parse syntax
     syntax varlist(min=1 max=1 numeric) ///
         [, TREATment(varname numeric) ///
            TREat_time(real -999) ///
@@ -39,15 +48,16 @@ program define _pretest_parse_time, rclass
     
     local timevar `varlist'
     
-    // ========================================
-    // 1. Get unique time values and compute T
-    // ========================================
+    // -------------------------------------------------------------------------
+    // Step 1: Extract unique time values and compute T
+    // -------------------------------------------------------------------------
+    // Per Section 2.1, we work with T time periods. The original time values
+    // are mapped to consecutive integers 1, ..., T for internal computations.
     
-    // Get all unique time values (sorted ascending)
     qui levelsof `timevar', local(time_levels)
     local T : word count `time_levels'
     
-    // Store time values in Stata matrix (for later access)
+    // Store original time values in a matrix for mapping back to user units
     tempname time_vals
     matrix `time_vals' = J(`T', 1, .)
     local i = 1
@@ -56,35 +66,41 @@ program define _pretest_parse_time, rclass
         local ++i
     }
     
-    // Get time range
+    // Extract time range bounds
     local t_min : word 1 of `time_levels'
     local t_max : word `T' of `time_levels'
     
-    // ========================================
-    // 2. Check for gaps in time variable
-    // ========================================
+    // -------------------------------------------------------------------------
+    // Step 2: Detect non-consecutive time values
+    // -------------------------------------------------------------------------
+    // The methodology uses consecutive period indices internally. If the
+    // original time variable has gaps (e.g., 2006, 2008, 2010), we note this
+    // and proceed with the mapping to 1, 2, 3, etc.
     
     local has_gap = 0
     if `t_max' - `t_min' + 1 != `T' {
         local has_gap = 1
-        di as text "Note: Time variable has non-consecutive values (`T' periods from `t_min' to `t_max')."
-        di as text "      Internal mapping applied automatically."
+        di as text "Note: Time variable has non-consecutive values" ///
+            " (`T' periods spanning `t_min' to `t_max')."
+        di as text "      Internal consecutive indexing applied."
     }
     
-    // ========================================
-    // 3. Determine treatment time t0
-    // ========================================
-    // Priority: user-specified > data inference > error
+    // -------------------------------------------------------------------------
+    // Step 3: Determine treatment time t0
+    // -------------------------------------------------------------------------
+    // t0 is the first post-treatment period. Priority order:
+    //   1. User-specified via treat_time() option
+    //   2. Inferred from time-varying treatment indicator (panel data only)
+    //   3. Error if neither available
     
     local t0 = .
     local t0_method = ""
     
-    // Mode 1: User explicitly specifies treat_time
+    // --- Method 1: User-specified treatment time ---
     if `treat_time' != -999 {
         local t0_orig = `treat_time'
         
-        // Validate treat_time is in data range
-        // Note: treat_time is original value, need to check if exists in data
+        // Validate that the specified time exists in the data
         local t0_found = 0
         local t0_index = 0
         local i = 1
@@ -96,47 +112,46 @@ program define _pretest_parse_time, rclass
             local ++i
         }
         
-        // If treat_time not in data, check if outside range
+        // Handle invalid treatment time
         if `t0_found' == 0 {
-            // treat_time is not a valid time value in data
             if `t0_orig' < `t_min' | `t0_orig' > `t_max' {
-                di as error "Error 109: treat_time(`t0_orig') is outside data time range [`t_min', `t_max']"
+                di as error "treat_time(`t0_orig') is outside the data" ///
+                    " time range [`t_min', `t_max']"
                 exit 109
             }
             else {
-                // treat_time in range but not a valid time point (gap case)
-                di as error "Error 109: treat_time(`t0_orig') is not a valid time value in the data"
-                di as error "  Available time values: `time_levels'"
+                // Time is within range but not observed (gap)
+                di as error "treat_time(`t0_orig') is not an observed" ///
+                    " time value in the data"
+                di as error "  Observed time values: `time_levels'"
                 exit 109
             }
         }
         
-        // Use consecutive index as internal t0
+        // Map to consecutive index
         local t0 = `t0_index'
         local t0_method "user-specified"
     }
-    // Mode 2: Infer from panel data with time-varying treatment
+    // --- Method 2: Infer from time-varying treatment in panel data ---
     else if `is_panel' == 1 & "`treatment'" != "" {
-        // Check if treatment varies within individuals
+        // For panel data, attempt to infer t0 from treatment timing
         capture xtset
         if _rc == 0 {
             local panelvar = r(panelvar)
             
-            // Compute treatment standard deviation within each individual
+            // Check if treatment varies within units over time
             tempvar treat_sd
             qui bysort `panelvar': egen `treat_sd' = sd(`treatment')
             
-            // Check if time-varying treatment exists
             qui sum `treat_sd'
             if r(max) > 0 {
-                // Treatment varies within some individuals, can infer t0
-                // Find minimum time when treatment first becomes 1
+                // Treatment is time-varying; find first treated period
                 qui levelsof `timevar' if `treatment' == 1, local(treat_times)
                 
                 if "`treat_times'" != "" {
                     local t0_orig : word 1 of `treat_times'
                     
-                    // Find corresponding consecutive index
+                    // Map to consecutive index
                     local i = 1
                     foreach t of local time_levels {
                         if `t' == `t0_orig' {
@@ -145,88 +160,96 @@ program define _pretest_parse_time, rclass
                         local ++i
                     }
                     local t0_method "inferred from time-varying treatment"
-                    di as text "Note: t0=`t0_orig' (index `t0') inferred from time-varying treatment"
+                    di as text "Note: Treatment time t0=`t0_orig'" ///
+                        " (index `t0') inferred from treatment indicator."
                 }
                 else {
-                    // No observations with treatment==1
-                    di as error "Error 100: No observations with treatment=1 found"
-                    di as error "  Cannot infer treatment time. Please specify treat_time(#)"
+                    di as error "No observations with treatment=1 found."
+                    di as error "  Please specify treat_time(#)."
                     exit 100
                 }
             }
             else {
-                // Treatment is time-invariant - typical for block-adoption design
-                // Use friendly message instead of error
+                // Treatment is time-invariant: block-adoption design
+                // This is the standard case per Section 1.2 of the paper
                 di as text ""
-                di as text "{bf:Note: Block-adoption design detected}"
-                di as text "  Treatment indicator is time-invariant within individuals."
-                di as text "  This is typical for block-adoption DID designs where:"
-                di as text "    - Treatment group (D=1) is always treated after t₀"
-                di as text "    - Control group (D=0) is never treated"
+                di as text "{bf:Block-adoption design detected}"
+                di as text "  Treatment is time-invariant within units, which is"
+                di as text "  typical for block-adoption DID designs where all"
+                di as text "  treated units receive treatment at the same time."
                 di as text ""
-                di as error "  → Please specify {bf:treat_time(#)} to indicate t₀"
-                di as text "    t₀ = first post-treatment period (when treatment takes effect)"
-                di as text "    Example: treat_time(2010) if policy was implemented in 2010"
+                di as error "  Please specify {bf:treat_time(#)} to indicate t0,"
+                di as text "  the first post-treatment period."
+                di as text "  Example: treat_time(2010) if treatment began in 2010."
                 exit 100
             }
         }
         else {
-            // xtset failed (should not happen since is_panel=1)
-            di as error "Error 100: Panel structure not set. Please specify treat_time(#)"
+            di as error "Panel structure not set. Please specify treat_time(#)."
             exit 100
         }
     }
-    // Mode 3: Repeated cross-section, must specify
+    // --- Method 3: Repeated cross-sections require explicit specification ---
     else {
-        di as error "Error 100: For repeated cross-sections, treat_time(#) is required"
-        di as error "  Hint: t0 is the first post-treatment period"
-        di as error "  Example: treat_time(2010) if treatment occurred in 2010"
+        di as error "Treatment time cannot be inferred from the data."
+        di as error "  Please specify treat_time(#), where # is the first"
+        di as error "  post-treatment period."
+        di as error "  Example: treat_time(2010) if treatment began in 2010."
         exit 100
     }
     
-    // ========================================
-    // 4. Compute time parameters
-    // ========================================
+    // -------------------------------------------------------------------------
+    // Step 4: Compute derived time parameters
+    // -------------------------------------------------------------------------
+    // Per Section 2.1:
+    //   T_pre  = t0 - 1  (number of pre-treatment periods)
+    //   T_post = T - T_pre (number of post-treatment periods)
     
-    // T_pre = t0 - 1 (using consecutive index)
     local T_pre = `t0' - 1
-    
-    // T_post = T - T_pre
     local T_post = `T' - `T_pre'
     
-    // ========================================
-    // 5. Validate T_pre >= 2
-    // ========================================
-    // Paper Section 2.1: "We presume that the pre-treatment period is of size at least T_pre >= 2"
-    // Reason: Iterative violation nu_t only defined for t >= 2
+    // -------------------------------------------------------------------------
+    // Step 5: Validate T_pre >= 2
+    // -------------------------------------------------------------------------
+    // Per Section 2.1: "We presume that the pre-treatment period is of size
+    // at least T_pre >= 2, so that at least one pre-treatment violation of
+    // parallel trends is well-defined."
+    //
+    // This is required because the iterative violation nu_t is defined for
+    // t = 2, ..., t0-1, which requires at least two pre-treatment periods.
     
     if `T_pre' < 2 {
-        di as error "Error 104: At least 2 pre-treatment periods required (T_pre >= 2)"
-        di as error "  Current configuration: T=`T', t0=`t0', T_pre=`T_pre'"
-        di as error "  Paper reference: Section 2.1"
-        di as error "  Reason: Iterative violation nu_t is only defined for t >= 2"
+        di as error "Insufficient pre-treatment periods."
+        di as error "  The pretest methodology requires at least 2 pre-treatment"
+        di as error "  periods (T_pre >= 2) for the iterative violations to be"
+        di as error "  well-defined."
+        di as error "  Current: T=`T', t0=`t0', T_pre=`T_pre'."
+        di as error "  Reference: Mikhaeil & Harshaw (2025), Section 2.1."
         exit 104
     }
     
-    // ========================================
-    // 6. Return results
-    // ========================================
+    // -------------------------------------------------------------------------
+    // Step 6: Return results
+    // -------------------------------------------------------------------------
     
-    // Get original t0 value (for display)
+    // Retrieve original t0 value for user-facing output
     local t0_orig_val : word `t0' of `time_levels'
     
-    return scalar T = `T'
-    return scalar t0 = `t0'
-    return scalar t0_orig = `t0_orig_val'
-    return scalar T_pre = `T_pre'
-    return scalar T_post = `T_post'
-    return scalar has_gap = `has_gap'
-    return scalar t_min = `t_min'
-    return scalar t_max = `t_max'
+    // Scalar returns
+    return scalar T = `T'           // Total number of periods
+    return scalar t0 = `t0'         // Treatment time (consecutive index)
+    return scalar t0_orig = `t0_orig_val'  // Treatment time (original units)
+    return scalar T_pre = `T_pre'   // Number of pre-treatment periods
+    return scalar T_post = `T_post' // Number of post-treatment periods
+    return scalar has_gap = `has_gap'      // Indicator for non-consecutive time
+    return scalar t_min = `t_min'   // Minimum observed time value
+    return scalar t_max = `t_max'   // Maximum observed time value
     
-    return local time_levels "`time_levels'"
-    return local t0_method "`t0_method'"
+    // Local returns
+    return local time_levels "`time_levels'"  // All unique time values
+    return local t0_method "`t0_method'"      // Method used to determine t0
     
-    // Return time mapping matrix
+    // Matrix return: mapping from consecutive index to original time values
     return matrix time_vals = `time_vals'
+    
 end

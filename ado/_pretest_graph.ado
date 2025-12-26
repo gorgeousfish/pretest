@@ -1,148 +1,161 @@
-*! _pretest_graph v0.1.0 - Event Study Plot for Pre-Test
+*! _pretest_graph.ado v0.1.0
+*! Event Study Visualization for Conditional Pre-Test Inference
 *!
 *! Description:
-*!   Generates event study plot showing pre-treatment violations and 
-*!   post-treatment DID estimates with confidence intervals.
-*!   Follows Stata post-estimation command conventions (reads from e()).
+*!   Generates event study plot displaying pre-treatment parallel trend 
+*!   violations and post-treatment DID estimates with confidence intervals.
+*!   Implements the graphical representation described in Section 1.1 of 
+*!   Mikhaeil & Harshaw (2025).
 *!
 *! Syntax:
-*!   _pretest_graph [, TItle(string) SAVing(string) NAME(string) REPLACE CONVentional]
+*!   _pretest_graph [, TItle(string) SAVing(string) NAME(string) REPLACE]
 *!
 *! Options:
-*!   title()      - Custom graph title
-*!   saving()     - Save graph to file (.gph, .png, .pdf, .eps)
-*!   name()       - Graph window name (for multiple graphs)
-*!   replace      - Replace existing file
-*!   conventional - Also show conventional CI (black) for comparison
+*!   title(string) - Custom graph title (default: includes author citation)
+*!   saving(string)- Export graph to file (.gph, .png, .pdf, .eps)
+*!   name(string)  - Stata graph window name (for managing multiple graphs)
+*!   replace       - Overwrite existing file when saving
 *!
-*! Data source: All from e() returns
-*!   e(nu)           - Iterative violations vector
-*!   e(delta)        - DID estimates vector  
-*!   e(Sigma)        - Asymptotic covariance matrix
-*!   e(threshold)    - Threshold M
-*!   e(t0)           - Treatment time point
-*!   e(T_pre)        - Pre-treatment periods
-*!   e(T_post)       - Post-treatment periods
-*!   e(N)            - Sample size
-*!   e(alpha)        - Significance level
-*!   e(mode)         - Mode ("iterative"/"overall")
-*!   e(pretest_pass) - Pretest result (1=PASS, 0=FAIL)
-*!   e(delta_bar)    - Average ATT
-*!   e(ci_lower/upper) - Conditional CI bounds
-*!   e(ci_conv_lower/upper) - Conventional CI bounds
+*! Required e() Returns (from pretest command):
+*!   e(nu)           - Iterative violations nu_t, t=2,...,t0-1 (T_pre-1 x 1)
+*!   e(delta)        - DID estimates delta_t, t=t0,...,T (T_post x 1)
+*!   e(Sigma)        - Asymptotic covariance matrix of theta (T-1 x T-1)
+*!   e(threshold)    - Acceptable violation threshold M (Section 3.1)
+*!   e(t0)           - Treatment time (first post-treatment period)
+*!   e(T_pre)        - Number of pre-treatment periods
+*!   e(T_post)       - Number of post-treatment periods
+*!   e(N)            - Sample size n
+*!   e(alpha)        - Significance level (default: 0.05)
+*!   e(mode)         - "iterative" (nu_t) or "overall" (nubar_t) mode
+*!   e(pretest_pass) - Preliminary test result (1=pass, 0=fail)
+*!   e(delta_bar)    - Average post-treatment ATT estimator
+*!   e(ci_lower)     - Conditional CI lower bound (Theorem 2)
+*!   e(ci_upper)     - Conditional CI upper bound (Theorem 2)
+*!   e(ci_conv_lower)- Conventional CI lower bound (for comparison)
+*!   e(ci_conv_upper)- Conventional CI upper bound (for comparison)
 *!
 *! Reference:
-*!   Mikhaeil & Harshaw (2025), "In Defense of the Pre-Test"
-*!   arXiv:2510.26470
+*!   Mikhaeil, J. M. and C. Harshaw. 2025. In Defense of the Pre-Test: Valid
+*!   Inference when Testing Violations of Parallel Trends for Difference-in-
+*!   Differences. arXiv preprint arXiv:2510.26470.
+*!   https://arxiv.org/abs/2510.26470
 
 program define _pretest_graph
     version 17.0
     
-    // Parse syntax - minimal parameters, read from e()
-    syntax [, TItle(string) SAVing(string) NAME(string) REPLACE CONVentional]
+    // Parse options (follows Stata post-estimation command conventions)
+    syntax [, TItle(string) SAVing(string) NAME(string) REPLACE]
     
-    // ========================================
-    // Step 1: Validate e() returns exist
-    // ========================================
+    // =========================================================================
+    // STEP 1: Validate e() Returns
+    // =========================================================================
+    // This command requires prior execution of -pretest- which stores
+    // estimation results in e(). Exit with error 301 if results not found.
     
-    // Check required e() returns
+    // Validate required matrices: nu (violations), delta (DID), Sigma (covariance)
     capture confirm matrix e(nu)
     if _rc != 0 {
-        di as error "Error: e(nu) not found. Run pretest command first."
+        di as error "e(nu) not found. Run {bf:pretest} command first."
         exit 301
     }
     
     capture confirm matrix e(delta)
     if _rc != 0 {
-        di as error "Error: e(delta) not found. Run pretest command first."
+        di as error "e(delta) not found. Run {bf:pretest} command first."
         exit 301
     }
     
     capture confirm matrix e(Sigma)
     if _rc != 0 {
-        di as error "Error: e(Sigma) not found. Run pretest command first."
+        di as error "e(Sigma) not found. Run {bf:pretest} command first."
         exit 301
     }
     
-    // Check required scalars
+    // Validate required scalars for inference
     local required_scalars "t0 T_pre T_post N alpha threshold pretest_pass"
     foreach s of local required_scalars {
         capture confirm scalar e(`s')
         if _rc != 0 {
-            di as error "Error: e(`s') not found. Run pretest command first."
+            di as error "e(`s') not found. Run {bf:pretest} command first."
             exit 301
         }
     }
     
-    // ========================================
-    // Step 2: Extract data from e()
-    // ========================================
+    // =========================================================================
+    // STEP 2: Extract Estimation Results from e()
+    // =========================================================================
     
-    // Scalars
-    local t0 = e(t0)
-    local T_pre = e(T_pre)
-    local T_post = e(T_post)
-    local n = e(N)
-    local alpha = e(alpha)
-    local threshold = e(threshold)
-    local pretest_pass = e(pretest_pass)
-    local delta_bar = e(delta_bar)
+    // Time structure parameters
+    local t0 = e(t0)              // Treatment time (first post-treatment period)
+    local T_pre = e(T_pre)        // Number of pre-treatment periods
+    local T_post = e(T_post)      // Number of post-treatment periods
+    local n = e(N)                // Sample size
     
-    // Mode
+    // Inference parameters
+    local alpha = e(alpha)        // Significance level (typically 0.05)
+    local threshold = e(threshold) // Acceptable violation threshold M (Section 3.1)
+    local pretest_pass = e(pretest_pass)  // Preliminary test result (Theorem 1)
+    local delta_bar = e(delta_bar)        // Average DID: delta_bar (Section 2.1)
+    
+    // Violation mode: "iterative" uses nu_t, "overall" uses nubar_t (Appendix C)
     local mode = e(mode)
     if "`mode'" == "" {
         local mode "iterative"
     }
     
-    // CI bounds (may be missing if pretest failed)
+    // Confidence interval bounds (missing if pretest failed)
+    // Conditional CI from Theorem 2; conventional CI for comparison
     local ci_lower = e(ci_lower)
     local ci_upper = e(ci_upper)
     local ci_conv_lower = e(ci_conv_lower)
     local ci_conv_upper = e(ci_conv_upper)
     
-    // Matrices
+    // Parameter vector components (Section 2.2, Equation 205):
+    // theta = (nu_2, ..., nu_{t0-1}, delta_{t0}, ..., delta_T)'
     tempname nu_mat delta_mat Sigma_mat
-    matrix `nu_mat' = e(nu)
-    matrix `delta_mat' = e(delta)
-    matrix `Sigma_mat' = e(Sigma)
+    matrix `nu_mat' = e(nu)       // Iterative violations (T_pre-1 x 1)
+    matrix `delta_mat' = e(delta) // DID estimates (T_post x 1)
+    matrix `Sigma_mat' = e(Sigma) // Asymptotic covariance (T-1 x T-1)
     
-    // Dimensions
-    local T_pre_minus_1 = rowsof(`nu_mat')
+    // Dimension verification
+    local T_pre_minus_1 = rowsof(`nu_mat')  // Should equal T_pre - 1
     local T_post_actual = rowsof(`delta_mat')
     
-    // Critical value for CI
+    // Critical value for Wald-type confidence intervals
     local z_crit = invnormal(1 - `alpha'/2)
     
-    // ========================================
-    // Step 3: Prepare plot data
-    // ========================================
+    // =========================================================================
+    // STEP 3: Construct Plot Data
+    // =========================================================================
+    // Create dataset with event study estimates and confidence intervals.
+    // Time axis uses relative time: negative for pre-treatment, 0+ for post.
     
     preserve
     clear
     
-    // Total points: T_pre-1 (violations) + T_post (DID estimates)
+    // Total observations: one per violation + one per DID estimate
     local total_points = `T_pre_minus_1' + `T_post_actual'
     quietly set obs `total_points'
     
-    // Generate variables
     quietly {
-        gen period = .
-        gen estimate = .
-        gen ci_lo = .
-        gen ci_hi = .
-        gen is_pre = .
+        // Initialize plot variables
+        gen period = .      // Relative time (treatment at 0)
+        gen estimate = .    // Point estimate (nu_t or delta_t)
+        gen ci_lo = .       // Lower CI bound
+        gen ci_hi = .       // Upper CI bound
+        gen is_pre = .      // Indicator: 1=pre-treatment, 0=post-treatment
         
-        // --- Pre-treatment violations ---
-        // Period mapping: t=2 to t=t0-1 -> relative time = 2-t0 to -1
-        // In relative time: violations at -T_pre+1, ..., -1
+        // -----------------------------------------------------------------
+        // Pre-treatment: Parallel trend violations
+        // -----------------------------------------------------------------
+        // Map absolute time t in {2,...,t0-1} to relative time {-(T_pre-1),...,-1}
         
-        // For overall mode: need cumulative sum transformation
         if "`mode'" == "overall" {
-            // Cumulative sum of violations: nu_bar_t = sum_{s=2}^{t} nu_s
-            // Also need covariance transformation: Sigma^Delta = A * Sigma * A'
+            // Overall mode: nubar_t = sum_{s=2}^t nu_s (Appendix C, Eq. 700)
+            // Requires linear transformation of covariance: Sigma^Delta = A*Sigma*A'
             tempname nu_bar A_mat Sigma_nu Sigma_nu_overall
             
-            // Build cumulative sum matrix A (lower triangular of 1s)
+            // Construct cumulative sum operator A (lower triangular of 1s)
             matrix `A_mat' = J(`T_pre_minus_1', `T_pre_minus_1', 0)
             forvalues i = 1/`T_pre_minus_1' {
                 forvalues j = 1/`i' {
@@ -150,25 +163,24 @@ program define _pretest_graph
                 }
             }
             
-            // Compute nu_bar = A * nu
+            // Transform violations: nubar = A * nu
             matrix `nu_bar' = `A_mat' * `nu_mat'
             
-            // Extract nu part of Sigma (upper-left T_pre_minus_1 x T_pre_minus_1)
+            // Extract and transform covariance for violations block
             matrix `Sigma_nu' = `Sigma_mat'[1..`T_pre_minus_1', 1..`T_pre_minus_1']
-            
-            // Transform: Sigma^Delta = A * Sigma_nu * A'
             matrix `Sigma_nu_overall' = `A_mat' * `Sigma_nu' * `A_mat''
             
-            // Fill pre-treatment data (overall violations)
+            // Populate pre-treatment observations (overall violations)
             forvalues i = 1/`T_pre_minus_1' {
-                local rel_time = `i' - `T_pre'  // e.g., T_pre=4, i=1 -> -3
+                local rel_time = `i' - `T_pre'
                 replace period = `rel_time' in `i'
                 
                 local est = `nu_bar'[`i', 1]
                 replace estimate = `est' in `i'
                 
-                // SE from transformed Sigma (Sigma is asymptotic cov, SE = sqrt(Sigma_ii/n))
-                // Paper Assumption 1: sqrt(n)(θ̂-θ) → N(0,Σ), so Var(θ̂) = Σ/n
+                // Standard error derivation (Assumption 1, Section 2.3):
+                // sqrt(n)(theta_hat - theta) -> N(0, Sigma)
+                // => Var(theta_hat) = Sigma/n, SE = sqrt(Sigma_ii/n)
                 local var_i = `Sigma_nu_overall'[`i', `i']
                 local se_i = sqrt(`var_i' / `n')
                 replace ci_lo = `est' - `z_crit' * `se_i' in `i'
@@ -177,16 +189,15 @@ program define _pretest_graph
             }
         }
         else {
-            // Iterative mode: use nu directly
+            // Iterative mode: use nu_t directly (default, Section 2.1)
             forvalues i = 1/`T_pre_minus_1' {
-                local rel_time = `i' - `T_pre'  // e.g., T_pre=4, i=1 -> -3
+                local rel_time = `i' - `T_pre'
                 replace period = `rel_time' in `i'
                 
                 local est = `nu_mat'[`i', 1]
                 replace estimate = `est' in `i'
                 
-                // SE from Sigma diagonal (Sigma is asymptotic cov, SE = sqrt(Sigma_ii/n))
-                // Paper Assumption 1: sqrt(n)(θ̂-θ) → N(0,Σ), so Var(θ̂) = Σ/n
+                // Standard error from Sigma diagonal (Assumption 1)
                 local var_i = `Sigma_mat'[`i', `i']
                 local se_i = sqrt(`var_i' / `n')
                 replace ci_lo = `est' - `z_crit' * `se_i' in `i'
@@ -195,18 +206,20 @@ program define _pretest_graph
             }
         }
         
-        // --- Post-treatment DID estimates ---
-        // Period mapping: t=t0 to t=T -> relative time = 0 to T_post-1
+        // -----------------------------------------------------------------
+        // Post-treatment: DID estimates delta_t
+        // -----------------------------------------------------------------
+        // Map absolute time t in {t0,...,T} to relative time {0,...,T_post-1}
+        
         forvalues i = 1/`T_post_actual' {
             local obs = `T_pre_minus_1' + `i'
-            local rel_time = `i' - 1  // t0 -> 0, t0+1 -> 1, etc.
+            local rel_time = `i' - 1  // t0 maps to 0
             replace period = `rel_time' in `obs'
             
             local est = `delta_mat'[`i', 1]
             replace estimate = `est' in `obs'
             
-            // SE from Sigma (delta part starts at T_pre_minus_1 + 1)
-            // Paper Assumption 1: sqrt(n)(θ̂-θ) → N(0,Σ), so Var(θ̂) = Σ/n
+            // Delta estimates are in theta[T_pre:T-1] (1-indexed: T_pre_minus_1+1)
             local idx = `T_pre_minus_1' + `i'
             local var_i = `Sigma_mat'[`idx', `idx']
             local se_i = sqrt(`var_i' / `n')
@@ -216,11 +229,16 @@ program define _pretest_graph
         }
     }
     
-    // ========================================
-    // Step 4: Build twoway graph
-    // ========================================
+    // =========================================================================
+    // STEP 4: Construct Event Study Graph
+    // =========================================================================
+    // Visual design follows Figure 1 of Mikhaeil & Harshaw (2025):
+    // - Pre-treatment: violations nu_t or nubar_t with pointwise CIs
+    // - Post-treatment: DID estimates delta_t with pointwise CIs
+    // - Threshold M shown as horizontal reference lines
+    // - Conditional CI (orange) vs conventional CI (gray) for ATT
     
-    // Separate pre and post data
+    // Separate pre- and post-treatment series for distinct styling
     tempvar pre_est pre_ci_lo pre_ci_hi post_est post_ci_lo post_ci_hi
     quietly {
         gen `pre_est' = estimate if is_pre == 1
@@ -231,12 +249,12 @@ program define _pretest_graph
         gen `post_ci_hi' = ci_hi if is_pre == 0
     }
     
-    // --- Graph title ---
+    // Graph title (default includes author citation)
     if "`title'" == "" {
         local title "Event Study with Pre-test (Mikhaeil-Harshaw 2025)"
     }
     
-    // --- Mode label ---
+    // Mode label for legend
     if "`mode'" == "overall" {
         local mode_label "Overall violations"
     }
@@ -244,7 +262,7 @@ program define _pretest_graph
         local mode_label "Iterative violations"
     }
     
-    // --- Pretest result label ---
+    // Visual encoding of preliminary test result (Theorem 1)
     if `pretest_pass' == 1 {
         local pretest_label "Pretest: PASS"
         local post_marker "O"
@@ -253,61 +271,62 @@ program define _pretest_graph
     else {
         local pretest_label "Pretest: FAIL"
         local post_marker "Oh"
-        local post_color "maroon%50"  // Faded color for FAIL
+        local post_color "maroon%50"  // Faded to indicate invalid inference
     }
     
-    // --- X-axis range (integer ticks) ---
+    // X-axis: relative time with integer ticks
     quietly summarize period
     local x_min_data = r(min)
     local x_max_data = r(max)
     local x_min = floor(`x_min_data') - 1
     local x_max = ceil(`x_max_data') + 1
     
-    // --- Y-axis: include threshold lines ---
+    // Y-axis: ensure threshold M is visible
     quietly summarize estimate
     local y_min = min(r(min), -`threshold') - 0.1 * abs(r(max) - r(min))
     local y_max = max(r(max), `threshold') + 0.1 * abs(r(max) - r(min))
     
-    // Handle edge case where range is zero
+    // Handle degenerate case
     if `y_min' == `y_max' {
         local y_min = `y_min' - 1
         local y_max = `y_max' + 1
     }
     
-    // --- Build graph command ---
+    // -----------------------------------------------------------------
+    // Build graph layers
+    // -----------------------------------------------------------------
     local graph_cmd ""
     
-    // Pre-treatment CI (navy) - thicker lines for visibility
+    // Layer 1: Pre-treatment CIs (navy)
     local graph_cmd `"`graph_cmd' (rcap `pre_ci_lo' `pre_ci_hi' period, lcolor(navy) lwidth(medthick))"'
     
-    // Pre-treatment points (navy, solid circle)
+    // Layer 2: Pre-treatment point estimates (navy circles)
     local graph_cmd `"`graph_cmd' (scatter `pre_est' period, mcolor(navy) msymbol(O) msize(medlarge))"'
     
-    // Post-treatment CI
+    // Layer 3: Post-treatment CIs (styling depends on test result)
     if `pretest_pass' == 1 {
-        // PASS: normal maroon
         local graph_cmd `"`graph_cmd' (rcap `post_ci_lo' `post_ci_hi' period, lcolor(maroon) lwidth(medthick))"'
     }
     else {
-        // FAIL: faded with dashed lines
+        // Dashed lines indicate inference may be invalid
         local graph_cmd `"`graph_cmd' (rcap `post_ci_lo' `post_ci_hi' period, lcolor(maroon%50) lwidth(medthick) lpattern(dash))"'
     }
     
-    // Post-treatment points (maroon)
+    // Layer 4: Post-treatment point estimates (maroon)
     local graph_cmd `"`graph_cmd' (scatter `post_est' period, mcolor(`post_color') msymbol(`post_marker') msize(medlarge))"'
     
-    // --- ATT with CI comparison ---
-    // Always show conventional CI for comparison, conditional CI only if PASS
+    // -----------------------------------------------------------------
+    // Average ATT with CI comparison (Figure 1 bottom panel)
+    // -----------------------------------------------------------------
     local att_pos = `x_max' - 0.3
     
-    // Create ATT marker data
     tempvar att_period att_est att_ci_lo att_ci_hi
     quietly {
         gen `att_period' = `att_pos' in 1
         gen `att_est' = `delta_bar' in 1
     }
     
-    // Conventional CI (always shown, black, slightly offset)
+    // Conventional CI (gray, always shown for comparison)
     if !missing(`ci_conv_lower') & !missing(`ci_conv_upper') {
         local att_pos_conv = `att_pos' - 0.15
         tempvar att_period_conv att_ci_conv_lo att_ci_conv_hi
@@ -320,7 +339,7 @@ program define _pretest_graph
         local graph_cmd `"`graph_cmd' (scatter `att_est' `att_period_conv', mcolor(gs6) msymbol(Oh) msize(medium))"'
     }
     
-    // Conditional CI (only if PASS, orange, prominent)
+    // Conditional CI (orange, Theorem 2; only if pretest passed)
     if `pretest_pass' == 1 & !missing(`ci_lower') & !missing(`ci_upper') {
         local att_pos_cond = `att_pos' + 0.15
         tempvar att_period_cond att_ci_cond_lo att_ci_cond_hi
@@ -333,10 +352,12 @@ program define _pretest_graph
         local graph_cmd `"`graph_cmd' (scatter `att_est' `att_period_cond', mcolor(orange) msymbol(D) msize(large))"'
     }
     
-    // --- Reference lines and formatting ---
+    // -----------------------------------------------------------------
+    // Annotation and legend
+    // -----------------------------------------------------------------
     local note_text "M = `: di %6.3f `threshold''  |  `pretest_label'"
     
-    // Legend entries - simplified labels, multi-row layout
+    // Legend labels
     if "`mode'" == "overall" {
         local pre_legend "Overall viol."
     }
@@ -344,18 +365,15 @@ program define _pretest_graph
         local pre_legend "Iter. viol."
     }
     
-    // Legend setup for CI comparison
+    // Build legend dynamically based on available CI types
     local legend_order "2 4"
     local legend_labels `"label(2 "`pre_legend'") label(4 "DID est.")"'
-    local legend_rows = 1
     
-    // Always add conventional CI to legend if available
     if !missing(`ci_conv_lower') {
         local legend_order "2 4 6"
         local legend_labels `"label(2 "`pre_legend'") label(4 "DID est.") label(6 "Conv. CI")"'
     }
     
-    // Add conditional CI to legend if PASS
     if `pretest_pass' == 1 & !missing(`ci_lower') {
         if !missing(`ci_conv_lower') {
             local legend_order "2 4 6 8"
@@ -367,34 +385,36 @@ program define _pretest_graph
         }
     }
     
-    // --- Build name option ---
+    // Graph window name option
     local name_opt ""
     if "`name'" != "" {
         local name_opt "name(`name', replace)"
     }
     
-    // --- Execute graph ---
+    // -----------------------------------------------------------------
+    // Render graph
+    // -----------------------------------------------------------------
     twoway `graph_cmd', ///
         xline(-0.5, lcolor(gs10) lpattern(dash) lwidth(medium)) ///
         yline(0, lcolor(gs6) lwidth(thin)) ///
         yline(`threshold', lcolor(orange%70) lpattern(shortdash)) ///
         yline(-`threshold', lcolor(orange%70) lpattern(shortdash)) ///
         xlabel(`x_min'(1)`x_max', labsize(small)) ///
-        ylabel(, angle(0) labsize(small) format(%9.2f)) ///
+        ylabel(, angle(horizontal) labsize(small) format(%9.2f)) ///
         xtitle("Time relative to treatment", size(small)) ///
         ytitle("Estimate", size(small)) ///
         title("`title'", size(medium)) ///
         note("`note_text'", size(vsmall)) ///
-        legend(order(`legend_order') `legend_labels' pos(6) rows(1) size(vsmall) symxsize(*.5)) ///
+        legend(order(`legend_order') `legend_labels' pos(6) rows(1) size(vsmall) symxsize(small)) ///
         graphregion(color(white)) plotregion(color(white)) ///
         `name_opt'
     
-    // ========================================
-    // Step 5: Handle saving
-    // ========================================
+    // =========================================================================
+    // STEP 5: Export Graph (Optional)
+    // =========================================================================
+    // Supports Stata native (.gph) and publication formats (.png, .pdf, .eps)
     
     if "`saving'" != "" {
-        // Determine file extension
         local ext = substr("`saving'", -4, 4)
         
         if "`ext'" == ".gph" {
@@ -404,7 +424,7 @@ program define _pretest_graph
             graph export "`saving'", `replace'
         }
         else {
-            // Default to .gph if no recognized extension
+            // Default to Stata native format
             graph save "`saving'.gph", `replace'
         }
         

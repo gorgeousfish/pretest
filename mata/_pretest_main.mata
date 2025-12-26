@@ -1,45 +1,35 @@
 *! _pretest_main.mata
 *! Main Computation Engine for Conditional Extrapolation Pre-Test
 *!
-*! Description:
-*!   Core computational module implementing the conditional extrapolation
-*!   pre-test framework for difference-in-differences (DID) research designs.
-*!   This framework provides valid inference conditional on passing a
-*!   preliminary test for violations of parallel trends in pre-treatment periods.
+*! Purpose:
+*!   Core module implementing the conditional extrapolation pre-test framework
+*!   for difference-in-differences designs. Provides valid inference conditional
+*!   on passing the preliminary test for pre-treatment parallel trends violations.
 *!
-*! Theoretical Framework:
-*!   The conditional extrapolation assumption (Assumption 3) posits that if
-*!   pre-treatment violations are below an acceptable threshold M, then
-*!   post-treatment violations are bounded by pre-treatment violations:
-*!
-*!       S_pre <= M  ==>  S_post <= S_pre
-*!
-*!   Under this assumption, confidence intervals are conditionally valid:
-*!       P(tau_bar in CI | phi = 0) >= 1 - alpha  (asymptotically)
+*! Theoretical Foundation:
+*!   Conditional Extrapolation Assumption (Assumption 3, Section 3.1):
+*!     If S_pre <= M, then S_post <= S_pre
+*!   
+*!   This implies conditional validity (Theorem 2, Section 5.1):
+*!     lim inf P(tau_bar in CI | phi = 0) >= 1 - alpha
 *!
 *! Algorithm Pipeline:
-*!   1. Estimate DID parameters: delta_t for t in {t0, ..., T}
-*!   2. Estimate violations: nu_t for t in {2, ..., t0-1}
-*!   3. Compute asymptotic covariance matrix Sigma (Assumption 1)
-*!   4. Calculate severity measure S_pre = ||nu||_p (Section 3.1)
-*!   5. Compute bias bound constant kappa (Proposition 1)
-*!   6. Monte Carlo critical value f(alpha, Sigma) (Appendix F)
-*!   7. Execute pre-test: phi = 1{S_pre > M} (Theorem 1)
-*!   8. Construct conditionally valid CI (Theorem 2)
+*!   Steps 1-3: Data preparation and DID estimation (Section 2.1)
+*!   Steps 4-5: Violation estimation and covariance (Section 2.2)
+*!   Step 6:    Severity measure S_pre (Section 3.1)
+*!   Step 7:    Bias bound constant kappa (Proposition 1, Section 3.2)
+*!   Step 8:    Critical value f(alpha, Sigma) (Appendix F)
+*!   Step 9:    Preliminary test phi = 1{S_hat_pre > M} (Theorem 1, Section 4.2)
+*!   Step 10:   Conditionally valid confidence interval (Theorem 2, Section 5.1)
 *!
-*! Module Dependencies:
-*!   _pretest_estimators.mata  - DID estimators (Section 2.1)
-*!   _pretest_violations.mata  - Violation estimators (Section 2.1)
-*!   _pretest_covariance.mata  - Covariance estimation (Section 2.2-2.3)
-*!   _pretest_psi.mata         - Critical value computation (Appendix F)
-*!   _pretest_ci.mata          - Confidence intervals (Section 5.1)
-*!   _pretest_kappa.mata       - Kappa constant (Section 3.2)
+*! Dependencies:
+*!   _pretest_estimators, _pretest_violations, _pretest_covariance,
+*!   _pretest_psi, _pretest_ci, _pretest_kappa
 *!
 *! Reference:
-*!   Mikhaeil, J.M. and C. Harshaw. 2025. In Defense of the Pre-Test: Valid
-*!   Inference when Testing Violations of Parallel Trends for Difference-in-
-*!   Differences. arXiv preprint arXiv:2510.26470.
-*!   https://arxiv.org/abs/2510.26470
+*!   Mikhaeil, J. M. and C. Harshaw (2025). In Defense of the Pre-Test:
+*!   Valid Inference when Testing Violations of Parallel Trends for
+*!   Difference-in-Differences. arXiv:2510.26470.
 
 version 17.0
 
@@ -153,22 +143,44 @@ void _pretest_main_compute(string scalar outcome_var,
     }
     
     // ========================================
+    // Step 2.5: Filter observations with missing values
+    // ========================================
+    // Exclude observations where Y, D, or time_mapped are missing to ensure
+    // consistent sample size reporting and valid group-time cell estimation.
+    // Note: Must filter AFTER time mapping because mapping can introduce
+    // additional missing values if time_orig values are not in time_vals_m.
+    real colvector valid_rows
+    real scalar n_total, n_valid
+    
+    n_total = rows(Y)
+    valid_rows = !rowmissing(Y) :& !rowmissing(D) :& !rowmissing(time_mapped)
+    n_valid = sum(valid_rows)
+    
+    // Filter to valid observations only
+    if (n_valid < n_total) {
+        Y = select(Y, valid_rows)
+        D = select(D, valid_rows)
+        time_mapped = select(time_mapped, valid_rows)
+    }
+    
+    // ========================================
     // Step 3: DID Estimation (Section 2.1)
     // ========================================
-    // The identified DID estimand for period t >= t0 (Equation 171):
+    // The identified difference-in-differences estimand for period t >= t0:
     //
     //   delta_t = E[Y_t - Y_{t0} | D=1] - E[Y_t - Y_{t0} | D=0]
     //
-    // Sample analog using group-time means:
+    // Sample analog using group-time cell means:
     //
     //   delta_hat_t = (Y_bar_{t,1} - Y_bar_{t0,1}) - (Y_bar_{t,0} - Y_bar_{t0,0})
     //
-    // The average post-treatment DID (Section 2.1):
+    // The average post-treatment DID estimand (Section 2.1):
     //
-    //   delta_bar = (1/T_post) * sum_{t=t0}^T delta_t
+    //   delta_bar = (1/T_post) * sum_{t=t0}^{T} delta_t
     //
-    // Under parallel trends: delta_bar = tau_bar (the average ATT)
-    // Under Assumption 3:    |tau_bar - delta_bar| <= kappa * S_pre
+    // Under exact parallel trends: delta_bar = tau_bar (the average ATT)
+    // Under Assumption 3 (Conditional Extrapolation):
+    //   |tau_bar - delta_bar| <= kappa * S_pre  (Proposition 1)
     
     real colvector delta_vec
     real scalar delta_bar
@@ -187,15 +199,15 @@ void _pretest_main_compute(string scalar outcome_var,
     //
     //   nu_t = E[Y^{(0)}_t - Y^{(0)}_{t-1} | D=1] - E[Y^{(0)}_t - Y^{(0)}_{t-1} | D=0]
     //
-    // Sample analog (Equation 184):
+    // Sample analog (Section 2.2):
     //
     //   nu_hat_t = (Y_bar_{t,1} - Y_bar_{t-1,1}) - (Y_bar_{t,0} - Y_bar_{t-1,0})
     //
-    // Overall violations measure cumulative deviation (Appendix C):
+    // Overall violations measure cumulative deviation from reference period t0:
     //
-    //   nubar_t = sum_{s=2}^t nu_s
+    //   nubar_t = sum_{s=2}^{t} nu_s
     //
-    // Equivalence relation (Equation 191): nubar_t = sum nu_s, nu_t = nubar_t - nubar_{t-1}
+    // Equivalence relation (Section 2.1): nubar_t = sum nu_s, nu_t = nubar_t - nubar_{t-1}
     real colvector nu_vec, nubar_vec
     
     nu_vec = _pretest_nu_vector(Y, D, time_mapped, t0_mata)
@@ -204,20 +216,20 @@ void _pretest_main_compute(string scalar outcome_var,
     st_matrix("__pretest_nu", nu_vec)
     
     // ========================================
-    // Step 5: Asymptotic Covariance Estimation (Section 2.2-2.3)
+    // Step 5: Asymptotic Covariance Estimation (Sections 2.2-2.3)
     // ========================================
-    // Assumption 1 (Asymptotic Normality):
+    // Assumption 1 (Asymptotic Normality, Section 2.3):
     //   sqrt(n) * (theta_hat - theta) -->d N(0, Sigma)
     //
-    // Assumption 2 (Consistent Variance Estimation):
+    // Assumption 2 (Consistent Variance Estimation, Section 2.3):
     //   Sigma_hat -->p Sigma
     //
-    // Parameter vector structure (Equation 205):
+    // Parameter vector structure (Section 2.2):
     //   theta = (nu_2, ..., nu_{t0-1}, delta_{t0}, ..., delta_T)'
     //
-    // Covariance matrix structure:
-    //   Sigma = | Sigma_nu      Sigma_nu,delta |
-    //           | Sigma_delta,nu  Sigma_delta  |
+    // Covariance matrix partitioned structure:
+    //   Sigma = | Sigma_nu        Sigma_nu,delta |
+    //           | Sigma_delta,nu  Sigma_delta    |
     real matrix Sigma_hat, Sigma_nu, Sigma_hat_overall
     real colvector cluster_vec
     real scalar sigma_valid
@@ -269,36 +281,48 @@ void _pretest_main_compute(string scalar outcome_var,
     st_numscalar("__pretest_S_pre", S_pre)
     
     // ========================================
-    // Step 7: Bias Bound Constant Kappa
+    // Step 7: Bias Bound Constant Kappa (Section 3.2, Proposition 1)
     // ========================================
-    // Reference: Section 3.2, Proposition 1
+    // Under conditional extrapolation (Assumption 3), if S_pre <= M, then
+    // the bias of the DID estimator is bounded:
     //
-    // Under conditional extrapolation (Assumption 3), if S_pre <= M:
     //   |tau_bar - delta_bar| <= kappa * S_pre
     //
-    // Kappa formula (via Holder's inequality):
-    //   kappa = ((1/T_post) * sum_{t=1}^{T_post} t^q)^{1/q}
-    //   where q is the Holder conjugate: 1/p + 1/q = 1
+    // Kappa formula (derived via Hoelder's inequality):
     //
-    // Note: In overall mode, kappa = 1 (violations directly bound bias)
+    //   kappa = ((1/T_post) * sum_{t=1}^{T_post} t^q)^{1/q}
+    //
+    // where q is the Hoelder conjugate exponent: 1/p + 1/q = 1
+    //
+    // Special cases:
+    //   p = 1:   kappa = T_post (maximum time weight)
+    //   p = 2:   kappa = sqrt((T_post+1)(2*T_post+1)/6) (closed-form)
+    //   p = inf: kappa = (T_post+1)/2 (average time weight)
+    //
+    // Note: In overall mode (nubar), kappa = 1 regardless of p, because
+    // cumulative violations directly bound bias without time-weight amplification.
     real scalar kappa
     kappa = _pretest_kappa(T_post_m, p_m, overall_flag)
     
     st_numscalar("__pretest_kappa", kappa)
     
     // ========================================
-    // Step 8: Critical Value via Monte Carlo
+    // Step 8: Critical Value via Monte Carlo (Section 5.1, Appendix F)
     // ========================================
-    // Reference: Section 5.1, Theorem 2; Appendix D
+    // The critical value f(alpha, Sigma) is defined as (Section 5.1):
     //
-    // The critical value f(alpha, Sigma) is defined as:
-    //   f(alpha, Sigma) = inf{c : P(psi(Z) >= c) <= alpha}
-    //   where Z ~ N(0, Sigma)
+    //   f(alpha, Sigma) = inf{c : P(psi(Z) >= c) <= alpha}  where Z ~ N(0, Sigma)
     //
-    // Monte Carlo algorithm:
-    //   1. Draw Z^(s) ~ N(0, Sigma) for s = 1,...,S
-    //   2. Compute psi^(s) = |mean(Z_post)| + kappa * severity(Z_pre)
-    //   3. Return (1-alpha) quantile of {psi^(s)}
+    // The psi function captures joint statistical uncertainty (Section 5.1):
+    //
+    //   psi(x) = |mean(x_post)| + kappa * ((1/(T_pre-1)) sum |x_pre|^p)^{1/p}
+    //
+    // Monte Carlo simulation algorithm (Appendix F):
+    //   1. Draw Z^{(s)} ~ N(0, Sigma) via Cholesky decomposition: Z = L * W, W ~ N(0, I)
+    //   2. Compute psi^{(s)} = psi(Z^{(s)}) for each simulation s = 1, ..., S
+    //   3. Return the ceiling((1-alpha)*S)-th order statistic as f(alpha, Sigma)
+    //
+    // Note: Regularization Sigma + epsilon*I ensures positive definiteness for Cholesky.
     real scalar f_alpha
     
     // Only compute critical value if covariance matrix is valid
@@ -318,18 +342,23 @@ void _pretest_main_compute(string scalar outcome_var,
     st_numscalar("__pretest_f_alpha", f_alpha)
     
     // ========================================
-    // Step 9: Pre-Test Evaluation
+    // Step 9: Pre-Test Evaluation (Section 4.2, Theorem 1)
     // ========================================
-    // Reference: Section 4.2, Theorem 1 (Asymptotic Consistency)
+    // The preliminary test evaluates whether extrapolation is justified:
     //
-    // Pre-test function:
     //   phi = 1{S_pre > M}
+    //
+    // Theorem 1 (Asymptotic Consistency): Under Assumption 1, this test is
+    // asymptotically consistent for separation s_n = omega(n^{-1/2}), meaning
+    // both Type I and Type II errors vanish as n -> infinity when the true
+    // severity is bounded away from the threshold M.
     //
     // Interpretation:
     //   phi = 0 (PASS): S_pre <= M, extrapolation condition satisfied,
-    //                   proceed with conditionally valid inference
+    //                   proceed with conditionally valid CI (Theorem 2)
     //   phi = 1 (FAIL): S_pre > M, extrapolation not justified,
-    //                   DID analysis may be invalid
+    //                   DID analysis requires alternative assumptions
+    //   phi = .       : Computation failed due to data issues
     real scalar M, phi, pretest_passed, n
     
     n = rows(Y)
@@ -361,19 +390,24 @@ void _pretest_main_compute(string scalar outcome_var,
     st_numscalar("__pretest_n", n)
     
     // ========================================
-    // Step 10: Conditionally Valid Confidence Interval
+    // Step 10: Conditionally Valid Confidence Interval (Theorem 2, Section 5.1)
     // ========================================
-    // Reference: Section 5.1, Theorem 2
+    // Theorem 2 (Conditional Validity): Under Assumptions 1-3 and the
+    // well-separated null hypothesis (s_n = omega(n^{-1/2})), the following
+    // confidence interval achieves asymptotic conditional coverage:
     //
-    // The conditionally valid CI for the average post-treatment ATT:
+    //   lim inf P(tau_bar in CI | phi = 0) >= 1 - alpha
     //
-    // Iterative mode:
+    // Iterative mode (Section 5.1):
     //   CI = delta_bar +/- {kappa * S_pre + f(alpha, Sigma) / sqrt(n)}
+    //        |______________|   |__________________________|
+    //         worst-case bias    statistical uncertainty
     //
-    // Overall mode:
+    // Overall mode (Appendix C):
     //   CI = delta_bar +/- {S_pre + f(alpha, Sigma) / sqrt(n)}
+    //        Note: kappa = 1 for overall violations (cumulative form)
     //
-    // Property: P(tau_bar in CI | phi = 0) >= 1 - alpha asymptotically
+    // Width scaling behavior (Corollary 1): O(max{S_pre, n^{-1/2}})
     real scalar ci_lower, ci_upper
     real rowvector ci_result
     
@@ -396,14 +430,16 @@ void _pretest_main_compute(string scalar outcome_var,
     st_numscalar("__pretest_ci_upper", ci_upper)
     
     // ========================================
-    // Step 11: Parameter Vector Theta
+    // Step 11: Parameter Vector Theta (Section 2.2)
     // ========================================
-    // Reference: Section 2.2, Equation for theta
-    //
     // The full parameter vector for asymptotic analysis:
+    //
     //   theta = (nu_2, ..., nu_{t0-1}, delta_{t0}, ..., delta_T)'
     //
     // Dimension: dim(theta) = (T_pre - 1) + T_post = T - 1
+    //
+    // In overall mode (Appendix C), replace nu with nubar:
+    //   theta^{Delta} = (nubar_2, ..., nubar_{t0-1}, delta_{t0}, ..., delta_T)'
     real colvector theta_vec
     
     theta_vec = nu_vec \ delta_vec
@@ -412,15 +448,18 @@ void _pretest_main_compute(string scalar outcome_var,
     // ========================================
     // Step 12: Severity Standard Error (Delta Method)
     // ========================================
-    // Reference: Section 5.1, variance estimation
+    // The Delta Method provides an approximation for the variance of S_pre:
     //
-    // The Delta Method approximation for SE(S_pre):
     //   Var(S_pre) approx grad_g' * Sigma_nu * grad_g
     //   SE(S_pre) = sqrt(Var(S_pre))
     //
-    // where grad_g = partial S_pre / partial nu is the gradient vector
+    // where grad_g = partial S_pre / partial nu is the gradient vector:
     //
-    // Note: Not applicable for p = infinity (L-inf norm is non-differentiable)
+    //   dg/dnu_t = |nu_t|^{p-1} * sign(nu_t) / [n_pre * S_pre^{p-1}]
+    //
+    // Note: The Delta Method requires differentiability of S_pre with respect to nu.
+    // For p = infinity (L-inf norm), the max function is non-differentiable,
+    // so SE(S_pre) returns missing. Bootstrap methods may be used instead.
     real scalar S_pre_se
     
     // Delta Method not applicable when p = infinity, return missing
@@ -434,18 +473,20 @@ void _pretest_main_compute(string scalar outcome_var,
     st_numscalar("__pretest_S_pre_se", S_pre_se)
     
     // ========================================
-    // Step 13: Conventional DID Confidence Interval
+    // Step 13: Conventional DID Confidence Interval (for comparison)
     // ========================================
-    // Standard CI assuming exact parallel trends (for comparison):
+    // Standard CI assuming exact parallel trends (classical DID inference):
     //
     //   CI_conv = delta_bar +/- z_{1-alpha/2} * SE(delta_bar)
     //
-    // where:
-    //   SE(delta_bar) = sqrt(Var(delta_bar))
+    // Variance estimation:
     //   Var(delta_bar) = (1/T_post^2) * 1' * Sigma_delta * 1 / n
+    //   SE(delta_bar) = sqrt(Var(delta_bar))
     //
-    // Note: This CI is only valid under exact parallel trends;
-    //       use the conditional CI from Step 10 under Assumption 3
+    // Important: This conventional CI is provided for comparison only.
+    // It is only valid under exact parallel trends (S_pre = S_post = 0).
+    // Under violations of parallel trends, use the conditionally valid CI
+    // from Step 10, which accounts for worst-case bias via kappa * S_pre.
     real scalar se_delta_bar, conv_ci_lower, conv_ci_upper
     real rowvector conv_ci_result
     real matrix Sigma_delta
