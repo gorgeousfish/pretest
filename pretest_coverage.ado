@@ -116,11 +116,7 @@ program define pretest_coverage, rclass
     
     tempname cov_rate pass_rate eff_cov n_passed n_total mean_width
     
-    mata: {
-        real colvector nu_vec
-        real rowvector results
-        real scalar T_pre_m
-        
+    mata:
         T_pre_m = `T_pre'
         
         // Generate violation vector based on pattern
@@ -136,7 +132,7 @@ program define pretest_coverage, rclass
         st_numscalar("`n_passed'", results[4])
         st_numscalar("`n_total'", results[5])
         st_numscalar("`mean_width'", results[6])
-    }
+    end
     
     // Display results
     di as text _n "{hline 78}"
