@@ -118,14 +118,20 @@ program define pretest_coverage, rclass
     
     mata:
         T_pre_m = `T_pre'
-        
-        // Generate violation vector based on pattern
         nu_vec = _pretest_violation_dgp(T_pre_m, "`violation'", `vscale')
-        
-        // Run coverage simulation
-        results = _pretest_coverage_simulation(`nsims', `tau', `nobs', `periods', `t0', `ptreat', nu_vec, `threshold', `p', `alpha', "`mode'", `mcsims', `seed')
-        
-        // Store results
+        nsims_m = `nsims'
+        tau_m = `tau'
+        nobs_m = `nobs'
+        periods_m = `periods'
+        t0_m = `t0'
+        ptreat_m = `ptreat'
+        thresh_m = `threshold'
+        p_m = `p'
+        alpha_m = `alpha'
+        mode_m = "`mode'"
+        mcsims_m = `mcsims'
+        seed_m = `seed'
+        results = _pretest_coverage_simulation(nsims_m, tau_m, nobs_m, periods_m, t0_m, ptreat_m, nu_vec, thresh_m, p_m, alpha_m, mode_m, mcsims_m, seed_m)
         st_numscalar("`cov_rate'", results[1])
         st_numscalar("`pass_rate'", results[2])
         st_numscalar("`eff_cov'", results[3])
