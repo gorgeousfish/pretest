@@ -127,21 +127,7 @@ program define pretest_coverage, rclass
         nu_vec = _pretest_violation_dgp(T_pre_m, "`violation'", `vscale')
         
         // Run coverage simulation
-        results = _pretest_coverage_simulation(
-            `nsims',          // n_sims
-            `tau',            // tau
-            `nobs',           // n
-            `periods',        // T
-            `t0',             // t0
-            `ptreat',         // p_treat
-            nu_vec,           // nu_vec
-            `threshold',      // M
-            `p',              // p_norm
-            `alpha',          // alpha
-            "`mode'",         // mode
-            `mcsims',         // S_sims
-            `seed'            // base_seed
-        )
+        results = _pretest_coverage_simulation(`nsims', `tau', `nobs', `periods', `t0', `ptreat', nu_vec, `threshold', `p', `alpha', "`mode'", `mcsims', `seed')
         
         // Store results
         st_numscalar("`cov_rate'", results[1])
