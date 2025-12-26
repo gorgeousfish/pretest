@@ -222,15 +222,7 @@ xtset id time
 pretest y, treatment(treat) time(time) threshold(0.5) treat_time(6)
 ```
 
-## Auxiliary Commands
 
-### `pretest_coverage`
-
-Monte Carlo simulation for validating conditional coverage properties.
-
-```stata
-pretest_coverage, threshold(0.5) nsims(1000) nobs(200)
-```
 
 ## References
 

@@ -35,7 +35,7 @@ d Difference-in-Differences. arXiv:2510.26470.
 d
 f pretest.ado
 f pretest.sthlp
-f pretest_coverage.ado
+
 f _pretest_mata.do
 f ado/_pretest_validate.ado
 f ado/_pretest_detect_panel.ado
@@ -44,7 +44,7 @@ f ado/_pretest_parse.ado
 f ado/_pretest_output.ado
 f ado/_pretest_graph.ado
 f ado/_pretest_data_quality.ado
-f ado/_pretest_check_coverage.ado
+
 f mata/_pretest_estimators.mata
 f mata/_pretest_violations.mata
 f mata/_pretest_covariance.mata
