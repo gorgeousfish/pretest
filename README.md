@@ -84,13 +84,6 @@ xtset state year
 pretest cigsale, treatment(treated) time(year) treat_time(1989) threshold(5)
 ```
 
-**Alternative:** Download ancillary files to current directory:
-
-```stata
-net get pretest, from("https://raw.githubusercontent.com/gorgeousfish/pretest/main/")
-use prop99_smoking.dta, clear
-```
-
 ## Syntax
 
 ```stata
