@@ -8,13 +8,21 @@
 *!   Mikhaeil & Harshaw (2025).
 *!
 *! Syntax:
-*!   _pretest_graph [, TItle(string) SAVing(string) NAME(string) REPLACE]
+*!   _pretest_graph [, TItle(string) SAVing(string) NAME(string) REPLACE
+*!                     CI_opt_pass(string) CI_opt_fail(string) LINE_opt_m(string)
+*!                     MARKER_opt_pre(string) MARKER_opt_post(string) twoway_options]
 *!
 *! Options:
-*!   title(string) - Custom graph title (default: includes author citation)
-*!   saving(string)- Export graph to file (.gph, .png, .pdf, .eps)
-*!   name(string)  - Stata graph window name (for managing multiple graphs)
-*!   replace       - Overwrite existing file when saving
+*!   title(string)       - Custom graph title (default: includes author citation)
+*!   saving(string)      - Export graph to file (.gph, .png, .pdf, .eps)
+*!   name(string)        - Stata graph window name (for managing multiple graphs)
+*!   replace             - Overwrite existing file when saving
+*!   ci_opt_pass(string) - Override CI style when pretest passes (replaces default)
+*!   ci_opt_fail(string) - Override CI style when pretest fails (replaces default)
+*!   line_opt_m(string)  - Override threshold M line style (replaces default)
+*!   marker_opt_pre(string)  - Override pre-treatment marker style (replaces default)
+*!   marker_opt_post(string) - Override post-treatment marker style (replaces default)
+*!   twoway_options      - Any standard Stata twoway graph options
 *!
 *! Required e() Returns (from pretest command):
 *!   e(nu)           - Iterative violations nu_t, t=2,...,t0-1 (T_pre-1 x 1)

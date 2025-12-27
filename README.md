@@ -115,6 +115,19 @@ pretest depvar , treatment(varname) time(varname) threshold(#) [options]
 | `simulate(#)`      | 5000    | Monte Carlo simulations                   |
 | `seed(#)`          | 12345   | Random seed                               |
 
+### Graph Customization
+
+| Option                 | Description                                      |
+| :--------------------- | :----------------------------------------------- |
+| `ci_opt_pass(string)`  | Override CI style when pretest passes            |
+| `ci_opt_fail(string)`  | Override CI style when pretest fails             |
+| `line_opt_m(string)`   | Override threshold M line style                  |
+| `marker_opt_pre(string)` | Override pre-treatment marker style            |
+| `marker_opt_post(string)` | Override post-treatment marker style          |
+| `scheme()`, `title()`, etc. | Any standard Stata twoway_options          |
+
+**Note:** Element-specific options (e.g., `ci_opt_pass`) completely replace default styling when specified.
+
 ## Key Formulas
 
 ### Pre-test (Theorem 1)

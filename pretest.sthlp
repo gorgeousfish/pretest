@@ -312,10 +312,10 @@ severity measure and for diagnosing potential numerical issues.
 {dlgtab:Graph customization}
 
 {phang}
-{opt ci_opt_pass(string)} specifies additional or override options for the 
-confidence interval lines when the pre-test passes. These options are appended 
-to the default styling ({cmd:lcolor(navy)} for pre-treatment, {cmd:lcolor(maroon)} 
-for post-treatment), allowing you to override colors, line patterns, and widths.
+{opt ci_opt_pass(string)} specifies options for the confidence interval lines 
+when the pre-test passes. When specified, this completely replaces the default 
+styling ({cmd:lcolor(navy)} for pre-treatment, {cmd:lcolor(maroon)} for 
+post-treatment). You must provide all desired styling options.
 Example: {cmd:ci_opt_pass(lcolor(black) lwidth(thick))}
 
 {phang}
@@ -352,9 +352,10 @@ Common options include:
 {phang2}- {cmd:note()} - Add or suppress footnotes{p_end}
 
 {pmore}
-{bf:Override precedence:} User options are appended after default options, so the
-Stata rule of "last option wins" ensures user preferences take precedence while
-preserving defaults for unspecified options.
+{bf:Override behavior:} Element-specific options ({cmd:ci_opt_pass}, {cmd:marker_opt_pre}, etc.) 
+completely replace the default styling when specified. Unspecified elements retain 
+their defaults. Standard {it:twoway_options} are appended and follow Stata's 
+"last option wins" rule.
 
 {marker examples}{...}
 {title:Examples}
