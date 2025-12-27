@@ -68,6 +68,10 @@ periods.
 net install pretest, from("https://raw.githubusercontent.com/gorgeousfish/pretest/main") replace
 ```
 
+### From SSC (Coming Soon)
+
+This package will be available on the SSC archive in the near future.
+
 
 
 ## Quick Start
@@ -137,7 +141,7 @@ The pre-test indicator is defined as:
 > φ = 𝟙{*Ŝ* <sub>pre </sub> > *M*}
 
 where φ = 0 indicates **PASS** (extrapolation justified) and φ = 1 indicates
-**FAIL** (extrapolation rejected). See Section 4.2 for the test definition.
+**FAIL** (extrapolation rejected).
 
 ### Average DID Estimate
 
@@ -175,13 +179,13 @@ For traditional ATT comparison, use `e(ci_conv_lower)` and `e(ci_conv_upper)`.
 
 ### Conditional Confidence Interval (Theorem 2)
  
- **1. Iterative mode (Default, Most Robust):**
+ **1. Iterative mode (Default):**
  
  > *I* = δ̄̂ ± {κ · *Ŝ* <sub>pre </sub> + *f*(α, Σ̂) / √*n*}
  
  Bias bound includes the multiplier κ ≥ 1.
  
- **2. Overall mode (Less Conservative):**
+ **2. Overall mode:**
  
  > *I* <sup>Δ </sup> = δ̄̂ ± {*Ŝ* <sup>Δ </sup><sub>pre </sub> + *f* <sup>Δ </sup>(α, Σ̂<sup>Δ </sup>) / √*n*}
  
