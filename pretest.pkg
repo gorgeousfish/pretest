@@ -57,3 +57,5 @@ f examples/organ_donations.dta
 f examples/example_organ_donations.do
 f examples/prop99_smoking.dta
 f examples/example_prop99.do
+f organ_donations.dta <- examples/organ_donations.dta
+f prop99_smoking.dta <- examples/prop99_smoking.dta
