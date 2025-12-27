@@ -44,7 +44,15 @@ program define _pretest_graph
     version 17.0
     
     // Parse options (follows Stata post-estimation command conventions)
-    syntax [, TItle(string) SAVing(string) NAME(string) REPLACE]
+    // Element-specific options allow granular control over visual elements
+    // User-provided twoway_options (*) are passed through to the final graph
+    syntax [, TItle(string) SAVing(string) NAME(string) REPLACE ///
+        CI_opt_pass(string asis) ///
+        CI_opt_fail(string asis) ///
+        LINE_opt_m(string asis) ///
+        MARKER_opt_pre(string asis) ///
+        MARKER_opt_post(string asis) ///
+        *]
     
     // =========================================================================
     // STEP 1: Validate e() Returns
@@ -123,6 +131,72 @@ program define _pretest_graph
     
     // Critical value for Wald-type confidence intervals
     local z_crit = invnormal(1 - `alpha'/2)
+    
+    // =========================================================================
+    // STEP 2.5: Define Default Styles (Mikhaeil-Harshaw 2025 Figure 1)
+    // =========================================================================
+    // These defaults implement the original paper's visual design.
+    // User options are appended AFTER defaults to enable overrides via Stata's
+    // "last option wins" precedence rule.
+    
+    // Pre-treatment confidence intervals (navy)
+    local def_ci_pre "lcolor(navy) lwidth(medthick)"
+    
+    // Pre-treatment point markers (navy circles)
+    local def_marker_pre "mcolor(navy) msymbol(O) msize(medlarge)"
+    
+    // Post-treatment confidence intervals (styling depends on test result)
+    local def_ci_pass "lcolor(maroon) lwidth(medthick)"
+    local def_ci_fail "lcolor(maroon%50) lwidth(medthick) lpattern(dash)"
+    
+    // Post-treatment point markers (maroon)
+    local def_marker_post_pass "mcolor(maroon) msymbol(O) msize(medlarge)"
+    local def_marker_post_fail "mcolor(maroon%50) msymbol(Oh) msize(medlarge)"
+    
+    // Threshold M horizontal lines (orange dashed)
+    local def_line_m "lcolor(orange%70) lpattern(shortdash)"
+    
+    // Apply user overrides: append user options to defaults
+    // Pre-treatment CI (uses pass styling as base for pre-treatment)
+    local ci_pre_opts "`def_ci_pre'"
+    if `"`ci_opt_pass'"' != "" {
+        local ci_pre_opts `"`ci_pre_opts' `ci_opt_pass'"'
+    }
+    
+    // Pre-treatment markers
+    local marker_pre_opts "`def_marker_pre'"
+    if `"`marker_opt_pre'"' != "" {
+        local marker_pre_opts `"`marker_pre_opts' `marker_opt_pre'"'
+    }
+    
+    // Post-treatment CI (pass case)
+    local ci_pass_opts "`def_ci_pass'"
+    if `"`ci_opt_pass'"' != "" {
+        local ci_pass_opts `"`ci_pass_opts' `ci_opt_pass'"'
+    }
+    
+    // Post-treatment CI (fail case)
+    local ci_fail_opts "`def_ci_fail'"
+    if `"`ci_opt_fail'"' != "" {
+        local ci_fail_opts `"`ci_fail_opts' `ci_opt_fail'"'
+    }
+    
+    // Post-treatment markers
+    if `pretest_pass' == 1 {
+        local marker_post_opts "`def_marker_post_pass'"
+    }
+    else {
+        local marker_post_opts "`def_marker_post_fail'"
+    }
+    if `"`marker_opt_post'"' != "" {
+        local marker_post_opts `"`marker_post_opts' `marker_opt_post'"'
+    }
+    
+    // Threshold M line
+    local line_m_opts "`def_line_m'"
+    if `"`line_opt_m'"' != "" {
+        local line_m_opts `"`line_m_opts' `line_opt_m'"'
+    }
     
     // =========================================================================
     // STEP 3: Construct Plot Data
@@ -297,23 +371,23 @@ program define _pretest_graph
     // -----------------------------------------------------------------
     local graph_cmd ""
     
-    // Layer 1: Pre-treatment CIs (navy)
-    local graph_cmd `"`graph_cmd' (rcap `pre_ci_lo' `pre_ci_hi' period, lcolor(navy) lwidth(medthick))"'
+    // Layer 1: Pre-treatment CIs (default: navy, user-overridable)
+    local graph_cmd `"`graph_cmd' (rcap `pre_ci_lo' `pre_ci_hi' period, `ci_pre_opts')"'
     
-    // Layer 2: Pre-treatment point estimates (navy circles)
-    local graph_cmd `"`graph_cmd' (scatter `pre_est' period, mcolor(navy) msymbol(O) msize(medlarge))"'
+    // Layer 2: Pre-treatment point estimates (default: navy circles, user-overridable)
+    local graph_cmd `"`graph_cmd' (scatter `pre_est' period, `marker_pre_opts')"'
     
-    // Layer 3: Post-treatment CIs (styling depends on test result)
+    // Layer 3: Post-treatment CIs (styling depends on test result, user-overridable)
     if `pretest_pass' == 1 {
-        local graph_cmd `"`graph_cmd' (rcap `post_ci_lo' `post_ci_hi' period, lcolor(maroon) lwidth(medthick))"'
+        local graph_cmd `"`graph_cmd' (rcap `post_ci_lo' `post_ci_hi' period, `ci_pass_opts')"'
     }
     else {
         // Dashed lines indicate inference may be invalid
-        local graph_cmd `"`graph_cmd' (rcap `post_ci_lo' `post_ci_hi' period, lcolor(maroon%50) lwidth(medthick) lpattern(dash))"'
+        local graph_cmd `"`graph_cmd' (rcap `post_ci_lo' `post_ci_hi' period, `ci_fail_opts')"'
     }
     
-    // Layer 4: Post-treatment point estimates (maroon)
-    local graph_cmd `"`graph_cmd' (scatter `post_est' period, mcolor(`post_color') msymbol(`post_marker') msize(medlarge))"'
+    // Layer 4: Post-treatment point estimates (user-overridable)
+    local graph_cmd `"`graph_cmd' (scatter `post_est' period, `marker_post_opts')"'
     
     // -----------------------------------------------------------------
     // Average ATT with CI comparison (Figure 1 bottom panel)
@@ -394,11 +468,13 @@ program define _pretest_graph
     // -----------------------------------------------------------------
     // Render graph
     // -----------------------------------------------------------------
+    // Append user-provided twoway_options at the end to enable full customization
+    // (Stata's "last option wins" rule ensures user options override defaults)
     twoway `graph_cmd', ///
         xline(-0.5, lcolor(gs10) lpattern(dash) lwidth(medium)) ///
         yline(0, lcolor(gs6) lwidth(thin)) ///
-        yline(`threshold', lcolor(orange%70) lpattern(shortdash)) ///
-        yline(-`threshold', lcolor(orange%70) lpattern(shortdash)) ///
+        yline(`threshold', `line_m_opts') ///
+        yline(-`threshold', `line_m_opts') ///
         xlabel(`x_min'(1)`x_max', labsize(small)) ///
         ylabel(, angle(horizontal) labsize(small) format(%9.2f)) ///
         xtitle("Time relative to treatment", size(small)) ///
@@ -407,7 +483,8 @@ program define _pretest_graph
         note("`note_text'", size(vsmall)) ///
         legend(order(`legend_order') `legend_labels' pos(6) rows(1) size(vsmall) symxsize(small)) ///
         graphregion(color(white)) plotregion(color(white)) ///
-        `name_opt'
+        `name_opt' ///
+        `options'
     
     // =========================================================================
     // STEP 5: Export Graph (Optional)

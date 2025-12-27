@@ -50,6 +50,14 @@
 {synopt:{opt sim:ulate(#)}}Monte Carlo simulations; default is {cmd:simulate(5000)}{p_end}
 {synopt:{opt seed(#)}}random number seed; default is {cmd:seed(12345)}{p_end}
 {synopt:{opt diag:nose}}display detailed diagnostic information{p_end}
+
+{syntab:Graph customization}
+{synopt:{opt ci_opt_pass(string)}}override CI style when pretest passes{p_end}
+{synopt:{opt ci_opt_fail(string)}}override CI style when pretest fails{p_end}
+{synopt:{opt line_opt_m(string)}}override threshold M line style{p_end}
+{synopt:{opt marker_opt_pre(string)}}override pre-treatment marker style{p_end}
+{synopt:{opt marker_opt_post(string)}}override post-treatment marker style{p_end}
+{synopt:{it:twoway_options}}any standard Stata {help twoway_options}{p_end}
 {synoptline}
 {p2colreset}{...}
 
@@ -301,6 +309,52 @@ including:
 This option is useful for understanding the components that contribute to the
 severity measure and for diagnosing potential numerical issues.
 
+{dlgtab:Graph customization}
+
+{phang}
+{opt ci_opt_pass(string)} specifies additional or override options for the 
+confidence interval lines when the pre-test passes. These options are appended 
+to the default styling ({cmd:lcolor(navy)} for pre-treatment, {cmd:lcolor(maroon)} 
+for post-treatment), allowing you to override colors, line patterns, and widths.
+Example: {cmd:ci_opt_pass(lcolor(black) lwidth(thick))}
+
+{phang}
+{opt ci_opt_fail(string)} specifies options for confidence interval lines when 
+the pre-test fails. Default styling uses dashed lines with reduced opacity to 
+indicate that inference may be invalid. Example: {cmd:ci_opt_fail(lcolor(gs8) lpattern(dot))}
+
+{phang}
+{opt line_opt_m(string)} specifies options for the horizontal threshold M lines.
+Default styling is {cmd:lcolor(orange%70) lpattern(shortdash)}. These lines mark
+the acceptable violation bounds +M and -M on the y-axis.
+Example: {cmd:line_opt_m(lcolor(red) lwidth(thick))}
+
+{phang}
+{opt marker_opt_pre(string)} specifies options for pre-treatment point estimate 
+markers. Default styling is {cmd:mcolor(navy) msymbol(O) msize(medlarge)}.
+Example: {cmd:marker_opt_pre(mcolor(black) msymbol(D))}
+
+{phang}
+{opt marker_opt_post(string)} specifies options for post-treatment point estimate
+markers. Default styling depends on pretest result: solid markers when passing,
+hollow markers when failing. Example: {cmd:marker_opt_post(mcolor(green) msymbol(T))}
+
+{phang}
+{it:twoway_options} are any of the options documented in {help twoway_options}.
+These are passed through to the final {cmd:twoway} graph command and allow full
+customization of titles, axes, legends, schemes, and other graph elements.
+Common options include:
+
+{phang2}- {cmd:title()}, {cmd:xtitle()}, {cmd:ytitle()} - Customize titles{p_end}
+{phang2}- {cmd:xlabel()}, {cmd:ylabel()} - Customize axis labels{p_end}
+{phang2}- {cmd:legend()} - Customize legend appearance and position{p_end}
+{phang2}- {cmd:scheme()} - Apply a different graph scheme (e.g., {cmd:scheme(s2mono)}){p_end}
+{phang2}- {cmd:note()} - Add or suppress footnotes{p_end}
+
+{pmore}
+{bf:Override precedence:} User options are appended after default options, so the
+Stata rule of "last option wins" ensures user preferences take precedence while
+preserving defaults for unspecified options.
 
 {marker examples}{...}
 {title:Examples}
@@ -362,6 +416,26 @@ To load it directly from GitHub:{p_end}
 
 {phang2}{cmd:. pretest outcome, treatment(treat) time(time) threshold(0.5) treat_time(6) nograph simulate(1000) seed(42)}{p_end}
 
+{pstd}{bf:Example 6: Custom graph styling for publication}{p_end}
+
+{pstd}Create a black and white graph suitable for print journals:{p_end}
+
+{phang2}{cmd:. pretest outcome, treatment(treat) time(time) threshold(0.5) treat_time(6) ///}{p_end}
+{phang2}{cmd:    ci_opt_pass(lcolor(black) lwidth(medium)) ///}{p_end}
+{phang2}{cmd:    marker_opt_pre(mcolor(black) msymbol(O)) ///}{p_end}
+{phang2}{cmd:    marker_opt_post(mcolor(black) msymbol(S)) ///}{p_end}
+{phang2}{cmd:    line_opt_m(lcolor(gs5) lpattern(dash)) ///}{p_end}
+{phang2}{cmd:    scheme(s2mono) title("Event Study")}{p_end}
+
+{pstd}Suppress titles for LaTeX integration:{p_end}
+
+{phang2}{cmd:. pretest outcome, treatment(treat) time(time) threshold(0.5) treat_time(6) ///}{p_end}
+{phang2}{cmd:    title("") note("") legend(off)}{p_end}
+
+{pstd}Export graph to publication formats:{p_end}
+
+{phang2}{cmd:. graph export "figure1.png", replace width(2400)}{p_end}
+{phang2}{cmd:. graph export "figure1.pdf", replace}{p_end}
 
 {marker results}{...}
 {title:Stored results}

@@ -74,7 +74,8 @@ program define pretest, eclass
          NOGraph ///
          SIMulate(integer 5000) ///
          SEED(integer 12345) ///
-         DIAGnose]
+         DIAGnose ///
+         *]
     
     local outcome `varlist'
     
@@ -635,7 +636,7 @@ program define pretest, eclass
     // STEP 10: Generate event study plot (unless suppressed)
     // =========================================================================
     if "`nograph'" == "" {
-        capture _pretest_graph
+        capture _pretest_graph, `options'
         if _rc != 0 {
             di as text "(Note: Graph generation failed with error `=_rc'. Results still valid.)"
         }
