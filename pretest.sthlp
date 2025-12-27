@@ -643,6 +643,7 @@ for Parallel Trends. {it:American Economic Review: Insights} 4(3): 305-322.
 {phang2}Email: {browse "mailto:xuanyuCAI@outlook.com":xuanyuCAI@outlook.com}{p_end}
 
 {phang2}Wenli Xu, City University of Macau{p_end}
+{phang2}Email: {browse "mailto:wlxu@cityu.edu.mo":wlxu@cityu.edu.mo}{p_end}
 
 {pstd}
 {bf:Methodology:} Jonas M. Mikhaeil and Christopher Harshaw,
