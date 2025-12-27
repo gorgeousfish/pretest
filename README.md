@@ -241,8 +241,8 @@ Roth, J. (2022). Pretest with Caution: Event-Study Estimates after Testing for P
 
 **Methodology:**
 
-- Jonas M. Mikhaeil (Columbia University)
-- Christopher Harshaw (Columbia University)
+- Jonas M. Mikhaeil
+- Christopher Harshaw
 
 ## License
 
