@@ -74,14 +74,21 @@ net install pretest, from("https://raw.githubusercontent.com/gorgeousfish/pretes
 
 ```stata
 * Load the included example data (California Proposition 99)
-findfile prop99_smoking.dta
-use "`r(fn)'", clear
+webuse set "https://raw.githubusercontent.com/gorgeousfish/pretest/main/"
+webuse prop99_smoking.dta, clear
 
 * Set panel structure
 xtset state year
 
 * Run pre-test with threshold M = 5
 pretest cigsale, treatment(treated) time(year) treat_time(1989) threshold(5)
+```
+
+**Alternative:** Download ancillary files to current directory:
+
+```stata
+net get pretest, from("https://raw.githubusercontent.com/gorgeousfish/pretest/main/")
+use prop99_smoking.dta, clear
 ```
 
 ## Syntax

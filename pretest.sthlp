@@ -305,6 +305,19 @@ severity measure and for diagnosing potential numerical issues.
 {marker examples}{...}
 {title:Examples}
 
+{pstd}{bf:Loading Example Data:}{p_end}
+
+{pstd}The package includes the Proposition 99 (California Tobacco Control Program) dataset.
+To load it directly from GitHub:{p_end}
+
+{phang2}{cmd:. webuse set "https://raw.githubusercontent.com/gorgeousfish/pretest/main/"}{p_end}
+{phang2}{cmd:. webuse prop99_smoking.dta, clear}{p_end}
+
+{pstd}Alternatively, download the ancillary files to your current directory:{p_end}
+
+{phang2}{cmd:. net get pretest, from("https://raw.githubusercontent.com/gorgeousfish/pretest/main/")}{p_end}
+{phang2}{cmd:. use prop99_smoking.dta, clear}{p_end}
+
 {pstd}{bf:Example 1: Basic panel data analysis}{p_end}
 
 {pstd}Generate simulated panel data and run the pre-test:{p_end}
