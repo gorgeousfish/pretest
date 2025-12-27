@@ -43,7 +43,8 @@ f ado/_pretest_parse_time.ado
 f ado/_pretest_parse.ado
 f ado/_pretest_output.ado
 f ado/_pretest_graph.ado
-f ado/_pretest_data_quality.adof mata/_pretest_estimators.mata
+f ado/_pretest_data_quality.ado
+f mata/_pretest_estimators.mata
 f mata/_pretest_violations.mata
 f mata/_pretest_covariance.mata
 f mata/_pretest_kappa.mata
