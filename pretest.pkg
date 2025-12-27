@@ -53,9 +53,6 @@ f mata/_pretest_ci.mata
 f mata/_pretest_main.mata
 f mata/_pretest_simulation.mata
 f mata/_pretest_utils.mata
-f examples/organ_donations.dta
-f examples/example_organ_donations.do
 f examples/prop99_smoking.dta
 f examples/example_prop99.do
-f organ_donations.dta <- examples/organ_donations.dta
-f prop99_smoking.dta <- examples/prop99_smoking.dta
+f prop99_smoking.dta
