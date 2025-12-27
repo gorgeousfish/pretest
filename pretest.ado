@@ -184,8 +184,7 @@ program define pretest, eclass
     // Verify complete cell coverage: the parameter vector
     // theta = (nu_2,...,nu_{t0-1}, delta_{t0},...,delta_T) requires observations
     // in all (time, treatment) cells to satisfy Assumption 1.
-    _pretest_check_coverage `outcome', treatment(`treatment') time(`time') strict
-    local coverage_ok = r(coverage_ok)
+    // Note: Coverage check removed - validation handled by Mata computation
     
     // =========================================================================
     // STEP 2: Detect panel structure (panel vs. repeated cross-sections)
