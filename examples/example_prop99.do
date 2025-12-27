@@ -36,3 +36,11 @@ pretest cigsale, treatment(treated) time(year) treat_time(1989) threshold(1) nog
 keep if year >= 1985 & year <= 1995
 pretest cigsale, treatment(treated) time(year) treat_time(1989) threshold(5)
 
+/*==============================================================================
+    Analysis 4: Overall Mode (Less Conservative)
+    Use overall violations mode when iterative mode is too strict.
+    This assumes cumulative errors are bounded, so kappa = 1.
+==============================================================================*/
+
+pretest cigsale, treatment(treated) time(year) treat_time(1989) threshold(5) overall
+

@@ -333,9 +333,9 @@ To load it directly from GitHub:{p_end}
 {phang2}{cmd:. display "Pre-test passed: " e(pretest_pass)}{p_end}
 {phang2}{cmd:. display "Estimated severity: " e(S_pre)}{p_end}
 
-{pstd}{bf:Example 2: Overall violations mode}{p_end}
+{pstd}{bf:Example 2: Overall violations mode (Less conservative)}{p_end}
 
-{pstd}Use overall violations mode (equivalent to testing TWFE lead coefficients):{p_end}
+{pstd}If the default iterative mode is too strict (due to the kappa multiplier), use the overall violations mode. This mode assumes that cumulative violations are bounded directly, limiting the worst-case bias (kappa = 1) and yielding narrower confidence intervals:{p_end}
 
 {phang2}{cmd:. pretest outcome, treatment(treat) time(time) threshold(0.5) treat_time(6) overall}{p_end}
 
