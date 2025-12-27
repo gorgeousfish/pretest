@@ -65,7 +65,7 @@ periods.
 ### From GitHub
 
 ```stata
-net install pretest, from("https://raw.githubusercontent.com/gorgeousfish/pretest/main/") replace
+net install pretest, from("https://raw.githubusercontent.com/gorgeousfish/pretest/main/pretest-stata") replace
 ```
 
 
