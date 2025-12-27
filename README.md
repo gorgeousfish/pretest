@@ -82,6 +82,9 @@ xtset state year
 
 * Run pre-test with threshold M = 5
 pretest cigsale, treatment(treated) time(year) treat_time(1989) threshold(5)
+
+* Or use overall mode (less conservative)
+pretest cigsale, treatment(treated) time(year) treat_time(1989) threshold(5) overall
 ```
 
 ## Syntax
@@ -158,22 +161,27 @@ The average DID estimand across post-treatment periods is:
 For traditional ATT comparison, use `e(ci_conv_lower)` and `e(ci_conv_upper)`.
 
 ### Conditional Confidence Interval (Theorem 2)
-
-**Iterative mode (Section 5.1):**
-
-> *I* = δ̄̂ ± {κ · *Ŝ* <sub>pre </sub> + *f*(α, Σ̂) / √*n*}
-
-**Overall mode (Appendix C):**
-
-> *I* <sup>Δ </sup> = δ̄̂ ± {*Ŝ* <sup>Δ </sup><sub>pre </sub> + *f* <sup>Δ </sup>(α, Σ̂<sup>Δ </sup>) / √*n*}
-
-The overall mode has no κ multiplier because cumulative violations directly bound the bias (see Appendix C, Proposition).
-
-### κ Constant (Section 3.2, Proposition 1)
-
-> κ = ((1/*T* <sub>post </sub>) · Σ <sub>t=1 </sub><sup>T <sub>post </sub></sup> *t* <sup>q </sup>)<sup>1/q </sup>
-
-where *q* is the Hölder conjugate of *p*, i.e., 1/*p* + 1/*q* = 1.
+ 
+ **1. Iterative mode (Default, Most Robust):**
+ 
+ > *I* = δ̄̂ ± {κ · *Ŝ* <sub>pre </sub> + *f*(α, Σ̂) / √*n*}
+ 
+ Bias bound includes the multiplier κ ≥ 1.
+ 
+ **2. Overall mode (Less Conservative):**
+ 
+ > *I* <sup>Δ </sup> = δ̄̂ ± {*Ŝ* <sup>Δ </sup><sub>pre </sub> + *f* <sup>Δ </sup>(α, Σ̂<sup>Δ </sup>) / √*n*}
+ 
+ Bias bound uses *no multiplier* (κ = 1).
+ 
+ ### κ Constant (Iterative Mode Only)
+ 
+ > κ = ((1/*T* <sub>post </sub>) · Σ <sub>t=1 </sub><sup>T <sub>post </sub></sup> *t* <sup>q </sup>)<sup>1/q </sup>
+ 
+ where *q* is the Hölder conjugate of *p*. κ captures the worst-case accumulation of iterative violations over time.
+  - For *T* <sub>post </sub> > 1, κ > 1.
+  - For *p* = 2 and large *T* <sub>post </sub>, κ grows with √*T* <sub>post </sub>.
+  - **Overall Mode:** κ is not used (effectively κ = 1), yielding narrower intervals.
 
 ## Stored Results
 
@@ -204,6 +212,25 @@ where *q* is the Hölder conjugate of *p*, i.e., 1/*p* + 1/*q* = 1.
 | `e(Sigma)` | Asymptotic covariance matrix                                 |
 | `e(b)`     | Coefficient vector                                           |
 | `e(V)`     | Variance matrix                                              |
+
+## Mode Selection: Iterative vs. Overall
+
+The package offers two assumptions about parallel trend violations, which have different sensitivities:
+
+| Feature | Iterative Mode (Default) | Overall Mode (`overall`) |
+| :--- | :--- | :--- |
+| **Assumption** | Violations accumulate period-to-period | Violations are bounded by cumulative total |
+| **Sensitivity** | Sensitive to **volatility/noise** (sharp changes) | Sensitive to **drift/trend** (long-term divergence) |
+| **Blind Spot** | May pass smooth linear trends (constant small changes) | May fail even if period-to-period changes are small |
+| **Bias Bound** | Scaled by κ (proportional to √*T* <sub>post </sub>) | **No multiplier** (κ = 1) |
+| **CI Width** | Generally Wider (accounts for worst-case accumulation) | Generally Narrower (assumes bounded total error) |
+
+**Recommendation:** 
+1. **Start with Iterative Mode** as it is the standard, robust approach.
+2. **Check Overall Mode if:**
+   - You suspect a **linear trend** or long-term drift (Iterative might incorrectly pass).
+   - The Iterative results are too conservative (wide CIs) despite visually decent parallel trends.
+3. **If Iterative PASSES but Overall FAILS:** This strongly suggests the presence of a smooth linear trend difference between groups. Extrapolation is risky unless you conceptually allow for this drift to continue.
 
 ## Example
 
@@ -265,3 +292,4 @@ and the Stata implementation:
       url={https://arxiv.org/abs/2510.26470}
 }
 ```
+
