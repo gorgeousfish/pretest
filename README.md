@@ -264,6 +264,14 @@ pretest y, treatment(treat) time(time) threshold(0.5) treat_time(6)
 
 
 
+
+## Future Roadmap
+
+The development team is evaluating the addition of **Threshold Sensitivity Analysis** in future versions.
+Current methodology treats $M$ as a fixed gatekeeper. Future updates may introduce a sensitivity analysis mode that:
+- Visualizes how the Conditional Confidence Interval (CI) varies across a continuous range of $M$ values.
+- Adopts a "Partial Identification" perspective to show the robustness of conclusions to different assumptions about the maximum acceptable violation.
+
 ## References
 
 Mikhaeil, J. M., & Harshaw, C. (2025). In Defense of the Pre-Test: Valid Inference When Testing Violations of Parallel Trends for Difference-in-Differences. *arXiv preprint arXiv:2510.26470*. Available at: https://arxiv.org/abs/2510.26470

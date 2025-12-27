@@ -6,8 +6,8 @@ clear all
 set more off
 
 * Load data
-findfile prop99_smoking.dta
-use "`r(fn)'", clear
+webuse set "https://raw.githubusercontent.com/gorgeousfish/pretest/main/"
+webuse prop99_smoking.dta, clear
 
 * Set panel structure
 xtset state year
