@@ -280,6 +280,12 @@ AGPL-3.0. See [LICENSE](LICENSE) for details.
 If you use this package in your research, please cite both the methodology paper
 and the Stata implementation:
 
+**APA Format:**
+
+> Cai, X., & Xu, W. (2025). *pretest: Stata module to implement the conditional extrapolation pre-test for difference-in-differences* (Version 0.1.0) [Computer software]. GitHub. https://github.com/gorgeousfish/pretest
+
+**BibTeX:**
+
 ```bibtex
 @software{pretest2025stata,
       title={pretest: Stata module to implement the conditional extrapolation pre-test for difference-in-differences},
