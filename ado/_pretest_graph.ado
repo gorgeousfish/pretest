@@ -159,26 +159,26 @@ program define _pretest_graph
     // Apply user overrides: append user options to defaults
     // Pre-treatment CI (uses pass styling as base for pre-treatment)
     local ci_pre_opts "`def_ci_pre'"
-    if `"`ci_opt_pass'"' != "" {
-        local ci_pre_opts `"`ci_pre_opts' `ci_opt_pass'"'
+    if "`ci_opt_pass'" != "" {
+        local ci_pre_opts "`ci_pre_opts' `ci_opt_pass'"
     }
     
     // Pre-treatment markers
     local marker_pre_opts "`def_marker_pre'"
-    if `"`marker_opt_pre'"' != "" {
-        local marker_pre_opts `"`marker_pre_opts' `marker_opt_pre'"'
+    if "`marker_opt_pre'" != "" {
+        local marker_pre_opts "`marker_pre_opts' `marker_opt_pre'"
     }
     
     // Post-treatment CI (pass case)
     local ci_pass_opts "`def_ci_pass'"
-    if `"`ci_opt_pass'"' != "" {
-        local ci_pass_opts `"`ci_pass_opts' `ci_opt_pass'"'
+    if "`ci_opt_pass'" != "" {
+        local ci_pass_opts "`ci_pass_opts' `ci_opt_pass'"
     }
     
     // Post-treatment CI (fail case)
     local ci_fail_opts "`def_ci_fail'"
-    if `"`ci_opt_fail'"' != "" {
-        local ci_fail_opts `"`ci_fail_opts' `ci_opt_fail'"'
+    if "`ci_opt_fail'" != "" {
+        local ci_fail_opts "`ci_fail_opts' `ci_opt_fail'"
     }
     
     // Post-treatment markers
@@ -188,14 +188,14 @@ program define _pretest_graph
     else {
         local marker_post_opts "`def_marker_post_fail'"
     }
-    if `"`marker_opt_post'"' != "" {
-        local marker_post_opts `"`marker_post_opts' `marker_opt_post'"'
+    if "`marker_opt_post'" != "" {
+        local marker_post_opts "`marker_post_opts' `marker_opt_post'"
     }
     
     // Threshold M line
     local line_m_opts "`def_line_m'"
-    if `"`line_opt_m'"' != "" {
-        local line_m_opts `"`line_m_opts' `line_opt_m'"'
+    if "`line_opt_m'" != "" {
+        local line_m_opts "`line_m_opts' `line_opt_m'"
     }
     
     // =========================================================================
