@@ -21,7 +21,7 @@ inference distortions (Roth, 2022). This package provides a principled solution.
 Under the **conditional extrapolation assumption**, if pre-treatment violations
 fall below an acceptable threshold *M*, extrapolation to post-treatment is justified:
 
-> **Assumption 3 (Conditional Extrapolation):** If *S* `<sub>`pre `</sub>` ≤ *M*, then *S* `<sub>`post `</sub>` ≤ *S* `<sub>`pre `</sub>`.
+> **Assumption 3 (Conditional Extrapolation):** If *S* <sub>pre </sub> ≤ *M*, then *S* <sub>post </sub> ≤ *S* <sub>pre </sub>.
 
 The package provides:
 
@@ -34,8 +34,8 @@ The package provides:
 
 | Requirement                         | Description                                                                                                                                                                 |
 | :---------------------------------- | :-------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Minimum 3 time periods**    | *T* `<sub>`pre `</sub>` ≥ 2. At least two pre-treatment periods are required because iterative violations ν̂`<sub>`t `</sub>` are only defined for *t* ≥ 2. |
-| **Block adoption design**     | All treated units must receive treatment at the same time*t* `<sub>`0 `</sub>`. Staggered adoption designs are **not** supported.                               |
+| **Minimum 3 time periods**    | *T* <sub>pre </sub> ≥ 2. At least two pre-treatment periods are required because iterative violations ν̂<sub>t </sub> are only defined for *t* ≥ 2. |
+| **Block adoption design**     | All treated units must receive treatment at the same time*t* <sub>0 </sub>. Staggered adoption designs are **not** supported.                               |
 | **Binary treatment**          | Treatment indicator must be coded as 0 (control) or 1 (treated).                                                                                                            |
 | **Complete time-group cells** | Each time period must contain observations in both treatment and control groups.                                                                                            |
 
@@ -109,7 +109,7 @@ pretest depvar , treatment(varname) time(varname) threshold(#) [options]
 
 | Option               | Default | Description                               |
 | :------------------- | :------ | :---------------------------------------- |
-| `treat_time(#)`    | auto    | Treatment time*t* `<sub>`0 `</sub>` |
+| `treat_time(#)`    | auto    | Treatment time*t* <sub>0 </sub> |
 | `p(#)`             | 2       | Severity norm*p* ≥ 1                   |
 | `alpha(#)`         | 0.05    | Significance level                        |
 | `level(#)`         | 95      | Confidence level (%)                      |
@@ -139,7 +139,7 @@ pretest depvar , treatment(varname) time(varname) threshold(#) [options]
 
 The pre-test indicator is defined as:
 
-> φ = 𝟙{*Ŝ* `<sub>`pre `</sub>` > *M*}
+> φ = 𝟙{*Ŝ* <sub>pre </sub> > *M*}
 
 where φ = 0 indicates **PASS** (extrapolation justified) and φ = 1 indicates
 **FAIL** (extrapolation rejected).
@@ -148,23 +148,23 @@ where φ = 0 indicates **PASS** (extrapolation justified) and φ = 1 indicates
 
 **Important:** The δ̄̂ reported by this package is **not** the traditional ATT.
 
-The DID estimand at time *t* is defined relative to the treatment time *t* `<sub>`0 `</sub>`:
+The DID estimand at time *t* is defined relative to the treatment time *t* <sub>0 </sub>:
 
-> δ̂`<sub>`t `</sub>` = (Ȳ `<sub>`t,D=1 `</sub>` − Ȳ `<sub>`t₀,D=1 `</sub>`) − (Ȳ `<sub>`t,D=0 `</sub>` − Ȳ `<sub>`t₀,D=0 `</sub>`)
+> δ̂<sub>t </sub> = (Ȳ <sub>t,D=1 </sub> − Ȳ <sub>t₀,D=1 </sub>) − (Ȳ <sub>t,D=0 </sub> − Ȳ <sub>t₀,D=0 </sub>)
 
-where Ȳ `<sub>`t,D=d `</sub>` denotes the sample mean of outcomes for group *D* = *d* at time *t*.
+where Ȳ <sub>t,D=d </sub> denotes the sample mean of outcomes for group *D* = *d* at time *t*.
 
 The average DID estimand across post-treatment periods is:
 
-> δ̄̂ = (1/*T* `<sub>`post `</sub>`) × Σ `<sub>`t=t₀`</sub><sup>`T `</sup>` δ̂`<sub>`t `</sub>`
+> δ̄̂ = (1/*T*<sub>post</sub>) × Σ<sub>t=t₀</sub><sup>T</sup> δ̂<sub>t</sub>
 
 **Key differences from traditional DID:**
 
 | Aspect                     | Paper's δ̄̂                                     | Traditional ATT        |
 | :------------------------- | :------------------------------------------------- | :--------------------- |
-| Reference point            | Treatment time*t* `<sub>`0 `</sub>`          | Pre-treatment average  |
-| δ̂`<sub>`t₀`</sub>` | Always 0 (by construction)                         | N/A                    |
-| Interpretation             | Incremental change from*t* `<sub>`0 `</sub>` | Total treatment effect |
+| Reference point            | Treatment time*t* <sub>0 </sub>          | Pre-treatment average  |
+| δ̂<sub>t₀</sub> | Always 0 (by construction)                         | N/A                    |
+| Interpretation             | Incremental change from*t* <sub>0 </sub> | Total treatment effect |
 
 **Example:** If treatment effect is constant at 2.0 per period:
 
@@ -182,24 +182,24 @@ For traditional ATT comparison, use `e(ci_conv_lower)` and `e(ci_conv_upper)`.
 
  **1. Iterative mode (Default):**
 
-> *I* = δ̄̂ ± {κ · *Ŝ* `<sub>`pre `</sub>` + *f*(α, Σ̂) / √*n*}
+> *I* = δ̄̂ ± {κ · *Ŝ* <sub>pre </sub> + *f*(α, Σ̂) / √*n*}
 
  Bias bound includes the multiplier κ ≥ 1.
 
  **2. Overall mode:**
 
-> *I* `<sup>`Δ `</sup>` = δ̄̂ ± {*Ŝ* `<sup>`Δ `</sup><sub>`pre `</sub>` + *f* `<sup>`Δ `</sup>`(α, Σ̂`<sup>`Δ `</sup>`) / √*n*}
+> *I*<sup>Δ</sup> = δ̄̂ ± {*Ŝ*<sup>Δ</sup><sub>pre</sub> + *f*<sup>Δ</sup>(α, Σ̂<sup>Δ</sup>) / √*n*}
 
  Bias bound uses *no multiplier* (κ = 1).
 
 ### κ Constant (Iterative Mode Only)
 
-> κ = ((1/*T* `<sub>`post `</sub>`) · Σ `<sub>`t=1 `</sub><sup>`T `<sub>`post `</sub></sup>` *t* `<sup>`q `</sup>`)`<sup>`1/q `</sup>`
+> κ = ((1/*T*<sub>post</sub>) · Σ<sub>t=1</sub><sup>T<sub>post</sub></sup> *t*<sup>q</sup>)<sup>1/q</sup>
 
  where *q* is the Hölder conjugate of *p*. κ captures the worst-case accumulation of iterative violations over time.
 
-- For *T* `<sub>`post `</sub>` > 1, κ > 1.
-- For *p* = 2 and large *T* `<sub>`post `</sub>`, κ grows with √*T* `<sub>`post `</sub>`.
+- For *T* <sub>post </sub> > 1, κ > 1.
+- For *p* = 2 and large *T* <sub>post </sub>, κ grows with √*T* <sub>post </sub>.
 - **Overall Mode:** κ is not used (effectively κ = 1), yielding narrower intervals.
 
 ## Stored Results
@@ -227,8 +227,8 @@ For traditional ATT comparison, use `e(ci_conv_lower)` and `e(ci_conv_upper)`.
 
 | Result       | Description                                                  |
 | :----------- | :----------------------------------------------------------- |
-| `e(nu)`    | Iterative violations (*T* `<sub>`pre `</sub>`−1 × 1) |
-| `e(delta)` | DID estimates (*T* `<sub>`post `</sub>` × 1)          |
+| `e(nu)`    | Iterative violations (*T* <sub>pre </sub>−1 × 1) |
+| `e(delta)` | DID estimates (*T* <sub>post </sub> × 1)          |
 | `e(theta)` | Full parameter vector θ̂                                   |
 | `e(Sigma)` | Asymptotic covariance matrix                                 |
 | `e(b)`     | Coefficient vector                                           |
@@ -243,7 +243,7 @@ The package offers two assumptions about parallel trend violations, which have d
 | **Assumption**  | Violations accumulate period-to-period                          | Violations are bounded by cumulative total               |
 | **Sensitivity** | Sensitive to**volatility/noise** (sharp changes)          | Sensitive to**drift/trend** (long-term divergence) |
 | **Blind Spot**  | May pass smooth linear trends (constant small changes)          | May fail even if period-to-period changes are small      |
-| **Bias Bound**  | Scaled by κ (proportional to √*T* `<sub>`post `</sub>`) | **No multiplier** (κ = 1)                         |
+| **Bias Bound**  | Scaled by κ (proportional to √*T* <sub>post </sub>) | **No multiplier** (κ = 1)                         |
 | **CI Width**    | Generally Wider (accounts for worst-case accumulation)          | Generally Narrower (assumes bounded total error)         |
 
 **Recommendation:**
