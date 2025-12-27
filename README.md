@@ -281,6 +281,14 @@ If you use this package in your research, please cite both the methodology paper
 and the Stata implementation:
 
 ```bibtex
+@software{pretest2025stata,
+      title={pretest: Stata module to implement the conditional extrapolation pre-test for difference-in-differences},
+      author={Xuanyu Cai and Wenli Xu},
+      year={2025},
+      version={0.1.0},
+      url={https://github.com/gorgeousfish/pretest}
+}
+
 @misc{mikhaeil2025defensepretestvalidinference,
       title={In Defense of the Pre-Test: Valid Inference when Testing Violations 
              of Parallel Trends for Difference-in-Differences}, 
