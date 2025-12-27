@@ -372,22 +372,22 @@ program define _pretest_graph
     local graph_cmd ""
     
     // Layer 1: Pre-treatment CIs (default: navy, user-overridable)
-    local graph_cmd `"`graph_cmd' (rcap `pre_ci_lo' `pre_ci_hi' period, `ci_pre_opts')"'
+    local graph_cmd "`graph_cmd' (rcap `pre_ci_lo' `pre_ci_hi' period, `ci_pre_opts')"
     
     // Layer 2: Pre-treatment point estimates (default: navy circles, user-overridable)
-    local graph_cmd `"`graph_cmd' (scatter `pre_est' period, `marker_pre_opts')"'
+    local graph_cmd "`graph_cmd' (scatter `pre_est' period, `marker_pre_opts')"
     
     // Layer 3: Post-treatment CIs (styling depends on test result, user-overridable)
     if `pretest_pass' == 1 {
-        local graph_cmd `"`graph_cmd' (rcap `post_ci_lo' `post_ci_hi' period, `ci_pass_opts')"'
+        local graph_cmd "`graph_cmd' (rcap `post_ci_lo' `post_ci_hi' period, `ci_pass_opts')"
     }
     else {
         // Dashed lines indicate inference may be invalid
-        local graph_cmd `"`graph_cmd' (rcap `post_ci_lo' `post_ci_hi' period, `ci_fail_opts')"'
+        local graph_cmd "`graph_cmd' (rcap `post_ci_lo' `post_ci_hi' period, `ci_fail_opts')"
     }
     
     // Layer 4: Post-treatment point estimates (user-overridable)
-    local graph_cmd `"`graph_cmd' (scatter `post_est' period, `marker_post_opts')"'
+    local graph_cmd "`graph_cmd' (scatter `post_est' period, `marker_post_opts')"
     
     // -----------------------------------------------------------------
     // Average ATT with CI comparison (Figure 1 bottom panel)
@@ -409,8 +409,8 @@ program define _pretest_graph
             gen `att_ci_conv_lo' = `ci_conv_lower' in 1
             gen `att_ci_conv_hi' = `ci_conv_upper' in 1
         }
-        local graph_cmd `"`graph_cmd' (rcap `att_ci_conv_lo' `att_ci_conv_hi' `att_period_conv', lcolor(gs6) lwidth(medthick))"'
-        local graph_cmd `"`graph_cmd' (scatter `att_est' `att_period_conv', mcolor(gs6) msymbol(Oh) msize(medium))"'
+        local graph_cmd "`graph_cmd' (rcap `att_ci_conv_lo' `att_ci_conv_hi' `att_period_conv', lcolor(gs6) lwidth(medthick))"
+        local graph_cmd "`graph_cmd' (scatter `att_est' `att_period_conv', mcolor(gs6) msymbol(Oh) msize(medium))"
     }
     
     // Conditional CI (orange, Theorem 2; only if pretest passed)
@@ -422,8 +422,8 @@ program define _pretest_graph
             gen `att_ci_cond_lo' = `ci_lower' in 1
             gen `att_ci_cond_hi' = `ci_upper' in 1
         }
-        local graph_cmd `"`graph_cmd' (rcap `att_ci_cond_lo' `att_ci_cond_hi' `att_period_cond', lcolor(orange) lwidth(thick))"'
-        local graph_cmd `"`graph_cmd' (scatter `att_est' `att_period_cond', mcolor(orange) msymbol(D) msize(large))"'
+        local graph_cmd "`graph_cmd' (rcap `att_ci_cond_lo' `att_ci_cond_hi' `att_period_cond', lcolor(orange) lwidth(thick))"
+        local graph_cmd "`graph_cmd' (scatter `att_est' `att_period_cond', mcolor(orange) msymbol(D) msize(large))"
     }
     
     // -----------------------------------------------------------------
