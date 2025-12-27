@@ -1,5 +1,5 @@
 v 3
-d pretest: Conditional Extrapolation Pre-Test for Difference-in-Differences
+d pretest: Stata module to implement the conditional extrapolation pre-test for difference-in-differences
 d
 d pretest implements the conditional extrapolation pre-test framework for
 d difference-in-differences (DID) designs proposed by Mikhaeil and Harshaw

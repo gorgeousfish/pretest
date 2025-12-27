@@ -16,7 +16,7 @@
 {title:Title}
 
 {phang}
-{bf:pretest} {hline 2} Conditional extrapolation pre-test for difference-in-differences designs
+{bf:pretest} {hline 2} Stata module to implement the conditional extrapolation pre-test for difference-in-differences
 
 
 {marker syntax}{...}
