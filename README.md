@@ -118,6 +118,7 @@ pretest depvar , treatment(varname) time(varname) threshold(#) [options]
 | `nograph`          | off     | Suppress event study graph                |
 | `simulate(#)`      | 5000    | Monte Carlo simulations                   |
 | `seed(#)`          | 12345   | Random seed                               |
+| `diagnose`         | off     | Display detailed diagnostic information   |
 
 ### Graph Customization
 
@@ -207,11 +208,13 @@ For traditional ATT comparison, use `e(ci_conv_lower)` and `e(ci_conv_upper)`.
 | Result              | Description                                                     |
 | :------------------ | :-------------------------------------------------------------- |
 | `e(S_pre)`        | Estimated pre-treatment severity                                |
+| `e(S_pre_se)`     | Standard error of S_pre (Delta method)                          |
 | `e(kappa)`        | Bias bound constant κ (iterative mode)                         |
 | `e(phi)`          | Pre-test result (0 = pass, 1 = fail, . = data issue or invalid) |
 | `e(data_valid)`   | Data validity indicator                                         |
 | `e(pretest_pass)` | Pre-test pass indicator                                         |
 | `e(delta_bar)`    | Average DID estimate                                            |
+| `e(se_delta_bar)` | Standard error of average DID estimate                          |
 | `e(ci_lower)`     | Conditional CI lower bound                                      |
 | `e(ci_upper)`     | Conditional CI upper bound                                      |
 | `e(T)`            | Total time periods                                              |
