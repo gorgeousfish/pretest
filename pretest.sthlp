@@ -28,7 +28,7 @@
 {cmd:,}
 {opt treat:ment(varname)}
 {opt time(varname)}
-{opt thr:eshold(#)}
+{opt thre:shold(#)}
 [{it:options}]
 
 {synoptset 25 tabbed}{...}
@@ -37,12 +37,12 @@
 {syntab:Required}
 {synopt:{opt treat:ment(varname)}}binary treatment indicator (0/1){p_end}
 {synopt:{opt time(varname)}}time variable{p_end}
-{synopt:{opt thr:eshold(#)}}acceptable violation threshold M > 0{p_end}
+{synopt:{opt thre:shold(#)}}acceptable violation threshold M > 0{p_end}
 
 {syntab:Optional}
 {synopt:{opt treat_time(#)}}treatment time point t0; auto-detected only if treatment is time-varying{p_end}
 {synopt:{opt p(#)}}severity norm p >= 1; default is {cmd:p(2)}{p_end}
-{synopt:{opt alpha(#)}}significance level; default is {cmd:alpha(0.05)}{p_end}
+{synopt:{opt al:pha(#)}}significance level; default is {cmd:alpha(0.05)}{p_end}
 {synopt:{opt level(#)}}confidence level; default is {cmd:level(95)}{p_end}
 {synopt:{opt cl:uster(varname)}}cluster variable for standard errors{p_end}
 {synopt:{opt over:all}}use overall violations mode (no kappa multiplier){p_end}
@@ -637,7 +637,12 @@ for Parallel Trends. {it:American Economic Review: Insights} 4(3): 305-322.
 {title:Authors}
 
 {pstd}
-{bf:Stata implementation:} Xuanyu Cai and Wenli Xu
+{bf:Stata Implementation:}
+
+{phang2}Xuanyu Cai, City University of Macau{p_end}
+{phang2}Email: {browse "mailto:xuanyuCAI@outlook.com":xuanyuCAI@outlook.com}{p_end}
+
+{phang2}Wenli Xu, City University of Macau{p_end}
 
 {pstd}
 {bf:Methodology:} Jonas M. Mikhaeil and Christopher Harshaw,
@@ -646,13 +651,3 @@ Department of Statistics, Columbia University.
 {pstd}
 Please cite both the methodology paper and this Stata implementation when using
 this command in published work.
-
-
-{title:Also see}
-
-{psee}
-Manual: {manlink R regress}, {manlink XT xtreg}, {manlink XT xtset}
-
-{psee}
-{space 2}Help: {help regress}, {help xtreg}, {help xtset}, {help xtdidregress}
-{p_end}
