@@ -263,13 +263,16 @@ Roth, J. (2022). Pretest with Caution: Event-Study Estimates after Testing for P
 
 **Stata Implementation:**
 
-- Xuanyu Cai
-- Wenli Xu
+- **Xuanyu Cai**, City University of Macau  
+  Email: [xuanyuCAI@outlook.com](mailto:xuanyuCAI@outlook.com)
+
+- **Wenli Xu**, City University of Macau  
+  Email: [wlxu@cityu.edu.mo](mailto:wlxu@cityu.edu.mo)
 
 **Methodology:**
 
-- Jonas M. Mikhaeil
-- Christopher Harshaw
+- **Jonas M. Mikhaeil**, Department of Statistics, Columbia University
+- **Christopher Harshaw**, Department of Statistics, Columbia University
 
 ## License
 
