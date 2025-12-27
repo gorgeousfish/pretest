@@ -283,6 +283,8 @@ and the Stata implementation:
 **APA Format:**
 
 > Cai, X., & Xu, W. (2025). *pretest: Stata module to implement the conditional extrapolation pre-test for difference-in-differences* (Version 0.1.0) [Computer software]. GitHub. https://github.com/gorgeousfish/pretest
+>
+> Mikhaeil, J. M., & Harshaw, C. (2025). In Defense of the Pre-Test: Valid Inference when Testing Violations of Parallel Trends for Difference-in-Differences. *arXiv preprint arXiv:2510.26470*. https://arxiv.org/abs/2510.26470
 
 **BibTeX:**
 
