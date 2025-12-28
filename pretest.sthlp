@@ -12,6 +12,7 @@
 {viewerjumpto "Methods and formulas" "pretest##methods"}{...}
 {viewerjumpto "References" "pretest##references"}{...}
 {viewerjumpto "Author" "pretest##author"}{...}
+{viewerjumpto "Citation" "pretest##citation"}{...}
 
 {title:Title}
 
@@ -724,6 +725,45 @@ for Parallel Trends. {it:American Economic Review: Insights} 4(3): 305-322.
 {bf:Methodology:} Jonas M. Mikhaeil and Christopher Harshaw,
 Department of Statistics, Columbia University.
 
+
+{marker citation}{...}
+{title:Citation}
+
 {pstd}
-Please cite both the methodology paper and this Stata implementation when using
-this command in published work.
+If you use this package in your research, please cite both the methodology paper
+and the Stata implementation:
+
+{pstd}
+{bf:APA Format:}
+
+{phang2}Cai, X., & Xu, W. (2025). {it:pretest: Stata module to implement the conditional}
+{it:extrapolation pre-test for difference-in-differences} (Version 0.1.0) [Computer software].
+GitHub. {browse "https://github.com/gorgeousfish/pretest"}{p_end}
+
+{phang2}Mikhaeil, J. M., & Harshaw, C. (2025). In Defense of the Pre-Test: Valid Inference
+when Testing Violations of Parallel Trends for Difference-in-Differences.
+{it:arXiv preprint arXiv:2510.26470}. {browse "https://arxiv.org/abs/2510.26470"}{p_end}
+
+{pstd}
+{bf:BibTeX:}
+
+        @software{c -(}pretest2025stata,
+              title = {c -(}pretest: Stata module to implement the conditional
+                       extrapolation pre-test for difference-in-differences{c )-},
+              author = {c -(}Xuanyu Cai and Wenli Xu{c )-},
+              year = {c -(}2025{c )-},
+              version = {c -(}0.1.0{c )-},
+              url = {c -(}https://github.com/gorgeousfish/pretest{c )-}
+        {c )-}
+
+        @misc{c -(}mikhaeil2025defensepretestvalidinference,
+              title = {c -(}In Defense of the Pre-Test: Valid Inference when
+                       Testing Violations of Parallel Trends for
+                       Difference-in-Differences{c )-},
+              author = {c -(}Jonas M. Mikhaeil and Christopher Harshaw{c )-},
+              year = {c -(}2025{c )-},
+              eprint = {c -(}2510.26470{c )-},
+              archivePrefix = {c -(}arXiv{c )-},
+              primaryClass = {c -(}stat.ME{c )-},
+              url = {c -(}https://arxiv.org/abs/2510.26470{c )-}
+        {c )-}
