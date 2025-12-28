@@ -265,16 +265,13 @@ gen id = ceil(_n/10)
 gen time = mod(_n-1, 10) + 1
 gen treat = (id <= 25)
 gen y = rnormal() + treat*(time >= 6)*0.5
-xtset id time
-
-* Run pre-test
-pretest y, treatment(treat) time(time) threshold(0.5) treat_time(6)
 ```
 
 ## Future Roadmap
 
 The development team is evaluating the following extensions for future versions:
 
+- **Triple Difference-in-Differences (DDD)**: Extending the conditional extrapolation framework to DDD designs with an additional grouping dimension.
 - **Staggered Adoption Support**: Extending the conditional extrapolation framework to staggered treatment adoption designs via cohort stacking.
 - **Covariate Adjustment**: Adding support for control variables in the estimation.
 - **Threshold Sensitivity Analysis**: Visualizing how the Conditional CI varies across a continuous range of $M$ values.
