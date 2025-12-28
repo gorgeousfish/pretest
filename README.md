@@ -334,3 +334,10 @@ and the Stata implementation:
       url={https://arxiv.org/abs/2510.26470}
 }
 ```
+
+## Recommended Resources
+
+For beginners in causal inference and econometrics:
+
+- [Causal Inference for the Brave and True](https://matheusfacure.github.io/python-causality-handbook/landing-page.html) - An excellent introductory tutorial on causal inference by Matheus Facure
+- [Causal Inference for the Brave and True (Chinese Edition)](https://ci-book.huangwz.com/intro) - Chinese translation by Wenzhe Huang and Wenli Xu
