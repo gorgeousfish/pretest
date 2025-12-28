@@ -35,6 +35,7 @@ d Difference-in-Differences. arXiv:2510.26470.
 d
 f pretest.ado
 f pretest.sthlp
+f lpretest.mlib
 
 f _pretest_mata.do
 f ado/_pretest_validate.ado

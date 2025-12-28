@@ -129,49 +129,66 @@ program define pretest, eclass
     // =========================================================================
     // STEP 0.2: Load Mata library (if not already in memory)
     // =========================================================================
+    // Priority: 1) Pre-compiled .mlib (fast, recommended)
+    //           2) Source compilation via _pretest_mata.do (fallback)
+    
     capture mata: mata describe _pretest_main_compute()
     local mata_exists = (_rc == 0)
     
     if !`mata_exists' {
-        // Get directory containing ado file
-        local ado_dir ""
-        local base_dir ""
-        capture findfile pretest.ado
-        if _rc == 0 {
-            local ado_dir = subinstr("`r(fn)'", "pretest.ado", "", .)
-            // Check if ado file is in /ado/ subdirectory - if so, base_dir is parent
-            if strpos("`ado_dir'", "/ado/") > 0 {
-                local base_dir = subinstr("`ado_dir'", "/ado/", "/", .)
-            }
-            else {
-                local base_dir "`ado_dir'"
-            }
-        }
-        
-        // Attempt to load Mata functions
         local mata_loaded = 0
         
-        // Method 1: Try base_dir (parent of /ado/)
-        if "`base_dir'" != "" & `mata_loaded' == 0 {
-            capture quietly do "`base_dir'_pretest_mata.do"
+        // Method 1: Load pre-compiled Mata library (lpretest.mlib)
+        // This is the preferred method - fast and reliable
+        capture findfile lpretest.mlib
+        if _rc == 0 {
+            // Library found, update mlib index to load it
+            quietly mata: mata mlib index
+            capture mata: mata describe _pretest_main_compute()
             if _rc == 0 {
                 local mata_loaded = 1
             }
         }
         
-        // Method 2: Try ado_dir directly
-        if "`ado_dir'" != "" & `mata_loaded' == 0 {
-            capture quietly do "`ado_dir'_pretest_mata.do"
-            if _rc == 0 {
-                local mata_loaded = 1
-            }
-        }
-        
-        // Method 3: Final fallback - use findfile
+        // Method 2: Fallback to source compilation if .mlib not found
         if `mata_loaded' == 0 {
-            capture findfile _pretest_mata.do
+            // Get directory containing ado file
+            local ado_dir ""
+            local base_dir ""
+            capture findfile pretest.ado
             if _rc == 0 {
-                capture quietly do "`r(fn)'"
+                local ado_dir = subinstr("`r(fn)'", "pretest.ado", "", .)
+                // Check if ado file is in /ado/ subdirectory - if so, base_dir is parent
+                if strpos("`ado_dir'", "/ado/") > 0 {
+                    local base_dir = subinstr("`ado_dir'", "/ado/", "/", .)
+                }
+                else {
+                    local base_dir "`ado_dir'"
+                }
+            }
+            
+            // Try base_dir (parent of /ado/)
+            if "`base_dir'" != "" & `mata_loaded' == 0 {
+                capture quietly do "`base_dir'_pretest_mata.do"
+                if _rc == 0 {
+                    local mata_loaded = 1
+                }
+            }
+            
+            // Try ado_dir directly
+            if "`ado_dir'" != "" & `mata_loaded' == 0 {
+                capture quietly do "`ado_dir'_pretest_mata.do"
+                if _rc == 0 {
+                    local mata_loaded = 1
+                }
+            }
+            
+            // Final fallback - use findfile
+            if `mata_loaded' == 0 {
+                capture findfile _pretest_mata.do
+                if _rc == 0 {
+                    capture quietly do "`r(fn)'"
+                }
             }
         }
     }
