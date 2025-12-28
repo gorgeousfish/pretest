@@ -273,11 +273,11 @@ pretest y, treatment(treat) time(time) threshold(0.5) treat_time(6)
 
 ## Future Roadmap
 
-The development team is evaluating the addition of **Threshold Sensitivity Analysis** in future versions.
-Current methodology treats $M$ as a fixed gatekeeper. Future updates may introduce a sensitivity analysis mode that:
+The development team is evaluating the following extensions for future versions:
 
-- Visualizes how the Conditional Confidence Interval (CI) varies across a continuous range of $M$ values.
-- Adopts a "Partial Identification" perspective to show the robustness of conclusions to different assumptions about the maximum acceptable violation.
+- **Staggered Adoption Support**: Extending the conditional extrapolation framework to staggered treatment adoption designs via cohort stacking.
+- **Covariate Adjustment**: Adding support for control variables in the estimation.
+- **Threshold Sensitivity Analysis**: Visualizing how the Conditional CI varies across a continuous range of $M$ values.
 
 ## References
 
