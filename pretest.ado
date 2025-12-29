@@ -50,10 +50,6 @@
 *!   e(ci_lower)     - CI lower bound (Theorem 2)
 *!   e(ci_upper)     - CI upper bound (Theorem 2)
 *!   e(pretest_pass) - 1 if pre-test passed (phi = 0), 0 otherwise
-*!
-*! Example:
-*!   . sysuse auto, clear
-*!   . pretest price, treatment(foreign) time(rep78) threshold(500) treat_time(4)
 
 program define pretest, eclass
     version 17.0
