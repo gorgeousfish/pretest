@@ -1,0 +1,60 @@
+v 3
+d pretest: Stata module for conditional-extrapolation pre-test workflows in difference-in-differences
+d
+d pretest implements a conditional extrapolation pre-test workflow for
+d difference-in-differences (DID) designs following Mikhaeil and Harshaw
+d (2025). The command reports pre-test diagnostics and, when pretest_pass = 1,
+d pass-case interval endpoints centered on delta_bar under the conditional
+d extrapolation assumption.
+d
+d The package addresses a key criticism of preliminary testing in DID designs:
+d that conventional pre-tests lead to invalid conditional coverage. Under the
+d conditional extrapolation assumption, if pre-treatment parallel trend
+d violations fall below an acceptable threshold M, the violations can be
+d extrapolated to the post-treatment period.
+d
+d Key features:
+d   - Pre-test diagnostics for the conditional extrapolation gate
+d   - Pass-case interval endpoints centered on delta_bar
+d   - Iterative and overall interval constructions
+d   - Cluster() option
+d   - Event study visualization
+d
+d Requires: Stata 17.0+
+d
+d License: AGPL-3.0
+d
+d Distribution-Date: 20260402
+d
+d Version: 0.1.1
+d
+d Authors: Xuanyu Cai, Wenli Xu
+d
+d Reference: Mikhaeil, J. M., & Harshaw, C. (2025). In Defense of the Pre-Test:
+d Valid Inference when Testing Violations of Parallel Trends for
+d Difference-in-Differences. arXiv:2510.26470.
+d
+f pretest.ado
+f pretest.sthlp
+f lpretest.mlib
+
+f _pretest_mata.do
+f ado/_pretest_validate.ado
+f ado/_pretest_detect_panel.ado
+f ado/_pretest_parse_time.ado
+f ado/_pretest_parse.ado
+f ado/_pretest_output.ado
+f ado/_pretest_graph.ado
+f ado/_pretest_data_quality.ado
+f mata/_pretest_estimators.mata
+f mata/_pretest_violations.mata
+f mata/_pretest_covariance.mata
+f mata/_pretest_kappa.mata
+f mata/_pretest_psi.mata
+f mata/_pretest_ci.mata
+f mata/_pretest_main.mata
+f mata/_pretest_simulation.mata
+f mata/_pretest_utils.mata
+f examples/prop99_smoking.dta
+f examples/example_prop99.do
+f prop99_smoking.dta

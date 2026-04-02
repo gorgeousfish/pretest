@@ -1,0 +1,318 @@
+-------------------------------------------------------------------------------
+      name:  <unnamed>
+       log:  /Users/cxy/Desktop/2026project/pertest_sj/pretest-main/examples/ex
+> ample_prop99.log
+  log type:  text
+ opened on:   2 Apr 2026, 15:38:39
+
+. 
+. /*===========================================================================
+> ===
+>     California Proposition 99 Tobacco Control Analysis
+> =============================================================================
+> =*/
+. 
+. clear all
+
+. set more off
+
+. 
+. * Load data: prefer a local shipped/downloaded copy and fall back to GitHub o
+> nly
+. * when no local file is available.
+. capture noisily findfile prop99_smoking.dta
+file "prop99_smoking.dta" not found
+
+. if _rc == 0 {
+.     use "`r(fn)'", clear
+. }
+
+. else {
+.     webuse set "https://raw.githubusercontent.com/gorgeousfish/pretest/main/"
+(prefix now "https://raw.githubusercontent.com/gorgeousfish/pretest/main")
+.     webuse prop99_smoking.dta, clear
+. }
+
+. 
+. * Set panel structure
+. xtset state year
+
+Panel variable: state (strongly balanced)
+ Time variable: year, 1970 to 2000
+         Delta: 1 unit
+
+. 
+. /*===========================================================================
+> ===
+>     Analysis 1: Full sample (1970-2000), M = 5
+> =============================================================================
+> =*/
+. 
+. pretest cigsale, treatment(treated) time(year) treat_time(1989) threshold(5)
+
+Data Validation Summary:
+  Total observations:            1,209
+  Valid observations:            1,209
+  Treated (D=1):                    31
+  Control (D=0):                 1,178
+Panel data detected: panelvar=state, timevar=year
+
+Time Structure:
+  T (total periods)     = 31
+  t0 (treatment time)   = 20
+  T_pre (pre-treatment) = 19
+  T_post (post-treatment) = 12
+
+------------------------------------------------------------------------
+Conditional Extrapolation Pre-Test for Difference-in-Differences
+Mikhaeil & Harshaw (2025)
+------------------------------------------------------------------------
+
+Model Specification
+------------------------------------------------------------------------
+   Threshold (M):          5.000       Mode:                   Iterative
+   Alpha (α):              0.050       Confidence:              95.0%
+   Norm (p):               2.0         Simulations:                5,000
+
+Time Structure
+------------------------------------------------------------------------
+   Total periods (T):      31          Treat time (t₀):        20
+   Pre-treatment (T_pre):  19          Post-treatment (T_post):12
+   Sample size (n):        1,209
+
+Pre-Test Results
+------------------------------------------------------------------------
+   Severity (Ŝ_pre):       2.1959
+   Kappa (κ):              7.360
+   Critical value f(α,Σ̂): 2637.820
+
+   Pre-test result:            PASS (Ŝ_pre ≤ M, extrapolation acceptable)
+
+Treatment Effect Estimates
+------------------------------------------------------------------------
+   δ̄ (change vs t₀):      -14.445
+   Conditional CI (95%):   [-106.470, 77.580]
+   Conventional CI (95%):  [-21.537, -7.353]  (assuming parallel trends)
+
+------------------------------------------------------------------------
+Note: φ = 1{Ŝ_pre > M}; PASS means φ=0 (extrapolation justified)
+      Iterative mode: CI = δ̄ ± {κ·Ŝ_pre + f(α,Σ̂)/√n}
+------------------------------------------------------------------------
+Note: δ̄ measures change relative to t₀, NOT the ATT level. See help pretest.
+
+. 
+. /*===========================================================================
+> ===
+>     Analysis 2: Full sample, smaller threshold M = 1 (stricter)
+> =============================================================================
+> =*/
+. 
+. pretest cigsale, treatment(treated) time(year) treat_time(1989) threshold(1) 
+> nograph
+
+Data Validation Summary:
+  Total observations:            1,209
+  Valid observations:            1,209
+  Treated (D=1):                    31
+  Control (D=0):                 1,178
+Panel data detected: panelvar=state, timevar=year
+
+Time Structure:
+  T (total periods)     = 31
+  t0 (treatment time)   = 20
+  T_pre (pre-treatment) = 19
+  T_post (post-treatment) = 12
+
+------------------------------------------------------------------------
+Conditional Extrapolation Pre-Test for Difference-in-Differences
+Mikhaeil & Harshaw (2025)
+------------------------------------------------------------------------
+
+Model Specification
+------------------------------------------------------------------------
+   Threshold (M):          1.000       Mode:                   Iterative
+   Alpha (α):              0.050       Confidence:              95.0%
+   Norm (p):               2.0         Simulations:                5,000
+
+Time Structure
+------------------------------------------------------------------------
+   Total periods (T):      31          Treat time (t₀):        20
+   Pre-treatment (T_pre):  19          Post-treatment (T_post):12
+   Sample size (n):        1,209
+
+Pre-Test Results
+------------------------------------------------------------------------
+   Severity (Ŝ_pre):       2.1959
+   Kappa (κ):              7.360
+   Critical value f(α,Σ̂): 2637.820
+
+   Pre-test result:            FAIL (Ŝ_pre > M, extrapolation rejected)
+
+Treatment Effect Estimates
+------------------------------------------------------------------------
+   δ̄ (change vs t₀):      -14.445
+   Conditional CI:         [Not available - pre-test failed]
+   Conventional CI (95%):  [-21.537, -7.353]  (assuming parallel trends)
+
+------------------------------------------------------------------------
+Note: φ = 1{Ŝ_pre > M}; PASS means φ=0 (extrapolation justified)
+      Iterative mode: CI = δ̄ ± {κ·Ŝ_pre + f(α,Σ̂)/√n}
+------------------------------------------------------------------------
+Note: δ̄ measures change relative to t₀, NOT the ATT level. See help pretest.
+
+. 
+. /*===========================================================================
+> ===
+>     Analysis 3: Shorter window (1985-1995), M = 5
+> =============================================================================
+> =*/
+. 
+. keep if year >= 1985 & year <= 1995
+(780 observations deleted)
+
+. pretest cigsale, treatment(treated) time(year) treat_time(1989) threshold(5)
+
+Data Validation Summary:
+  Total observations:              429
+  Valid observations:              429
+  Treated (D=1):                    11
+  Control (D=0):                   418
+Panel data detected: panelvar=state, timevar=year
+
+Time Structure:
+  T (total periods)     = 11
+  t0 (treatment time)   = 5
+  T_pre (pre-treatment) = 4
+  T_post (post-treatment) = 7
+
+------------------------------------------------------------------------
+Conditional Extrapolation Pre-Test for Difference-in-Differences
+Mikhaeil & Harshaw (2025)
+------------------------------------------------------------------------
+
+Model Specification
+------------------------------------------------------------------------
+   Threshold (M):          5.000       Mode:                   Iterative
+   Alpha (α):              0.050       Confidence:              95.0%
+   Norm (p):               2.0         Simulations:                5,000
+
+Time Structure
+------------------------------------------------------------------------
+   Total periods (T):      11          Treat time (t₀):        5
+   Pre-treatment (T_pre):  4           Post-treatment (T_post):7
+   Sample size (n):        429
+
+Pre-Test Results
+------------------------------------------------------------------------
+   Severity (Ŝ_pre):       2.1767
+   Kappa (κ):              4.472
+   Critical value f(α,Σ̂): 891.953
+
+   Pre-test result:            PASS (Ŝ_pre ≤ M, extrapolation acceptable)
+
+Treatment Effect Estimates
+------------------------------------------------------------------------
+   δ̄ (change vs t₀):      -9.342
+   Conditional CI (95%):   [-62.141, 43.456]
+   Conventional CI (95%):  [-16.146, -2.538]  (assuming parallel trends)
+
+------------------------------------------------------------------------
+Note: φ = 1{Ŝ_pre > M}; PASS means φ=0 (extrapolation justified)
+      Iterative mode: CI = δ̄ ± {κ·Ŝ_pre + f(α,Σ̂)/√n}
+------------------------------------------------------------------------
+Note: δ̄ measures change relative to t₀, NOT the ATT level. See help pretest.
+
+. 
+. /*===========================================================================
+> ===
+>     Analysis 4: Overall Mode (Cumulative-Violation Path) -- full sample
+>     Reload full sample before running overall so this is not a continuation o
+> f
+>     the 1985-1995 windowed sample from Analysis 3.
+>     Use overall when cumulative violations are the empirical question.
+>     This replaces the iterative violation path and sets kappa = 1.
+> =============================================================================
+> =*/
+. 
+. * Reload full dataset to restore the full 1970-2000 sample
+. capture noisily findfile prop99_smoking.dta
+file "prop99_smoking.dta" not found
+
+. if _rc == 0 {
+.     use "`r(fn)'", clear
+. }
+
+. else {
+.     webuse set "https://raw.githubusercontent.com/gorgeousfish/pretest/main/"
+(prefix now "https://raw.githubusercontent.com/gorgeousfish/pretest/main")
+.     webuse prop99_smoking.dta, clear
+. }
+
+. xtset state year
+
+Panel variable: state (strongly balanced)
+ Time variable: year, 1970 to 2000
+         Delta: 1 unit
+
+. 
+. pretest cigsale, treatment(treated) time(year) treat_time(1989) threshold(5) 
+> overall
+
+Data Validation Summary:
+  Total observations:            1,209
+  Valid observations:            1,209
+  Treated (D=1):                    31
+  Control (D=0):                 1,178
+Panel data detected: panelvar=state, timevar=year
+
+Time Structure:
+  T (total periods)     = 31
+  t0 (treatment time)   = 20
+  T_pre (pre-treatment) = 19
+  T_post (post-treatment) = 12
+
+------------------------------------------------------------------------
+Conditional Extrapolation Pre-Test for Difference-in-Differences
+Mikhaeil & Harshaw (2025)
+------------------------------------------------------------------------
+
+Model Specification
+------------------------------------------------------------------------
+   Threshold (M):          5.000       Mode:                   Overall
+   Alpha (α):              0.050       Confidence:              95.0%
+   Norm (p):               2.0         Simulations:                5,000
+
+Time Structure
+------------------------------------------------------------------------
+   Total periods (T):      31          Treat time (t₀):        20
+   Pre-treatment (T_pre):  19          Post-treatment (T_post):12
+   Sample size (n):        1,209
+
+Pre-Test Results
+------------------------------------------------------------------------
+   Severity (Ŝ_pre):       19.2112
+   Kappa (κ):              N/A  (overall mode uses Ŝ_pre directly)
+   Critical value f(α,Σ̂): 552.254
+
+   Pre-test result:            FAIL (Ŝ_pre > M, extrapolation rejected)
+
+Treatment Effect Estimates
+------------------------------------------------------------------------
+   δ̄ (change vs t₀):      -14.445
+   Conditional CI:         [Not available - pre-test failed]
+   Conventional CI (95%):  [-21.537, -7.353]  (assuming parallel trends)
+
+------------------------------------------------------------------------
+Note: φ = 1{Ŝ_pre > M}; PASS means φ=0 (extrapolation justified)
+      Overall mode: CI = δ̄ ± {Ŝ_pre + f(α,Σ̂)/√n} (no κ)
+------------------------------------------------------------------------
+Note: δ̄ measures change relative to t₀, NOT the ATT level. See help pretest.
+
+. 
+. log close
+      name:  <unnamed>
+       log:  /Users/cxy/Desktop/2026project/pertest_sj/pretest-main/examples/ex
+> ample_prop99.log
+  log type:  text
+ closed on:   2 Apr 2026, 15:38:59
+-------------------------------------------------------------------------------
