@@ -5,6 +5,25 @@ All notable changes to `pretest` will be documented in this file.
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
+## [0.1.2] - 2026-04-17
+
+### Changed
+
+- **`_pretest_output.ado`**: display labels converted to pure ASCII (e.g. `Alpha:`, `Kappa:`, `Severity (S_pre)`, `delta_bar (vs t0)`, `phi = 1{S_pre > M}`, `CI = delta_bar +/- {kappa*S_pre + f(a,S)/sqrt(n)}`) to avoid SMCL rendering issues on non-UTF8 locales and in log files; `t0` now shows the calendar value rather than the internal 1-based index
+- **`_pretest_output.ado`**: `S_pre` precision tightened from 4 decimals to 3 decimals in the Pre-Test Results block to match the scale of the statistic reported in the paper stlog
+
+### Added
+
+- **`_pretest_output.ado`**: new `SE(S_pre)` display line below `Severity (S_pre)` reporting the delta-method standard error of the severity estimate (value passed through from `pretest.ado` via the new `sdpre()` option)
+- **`pretest.ado`**: pipes the previously stored `e(S_pre_se)` through to `_pretest_output` via a new internal `sdpre()` option (no public syntax change)
+
+### Notes
+
+- No changes to estimators, interval constructions, or stored results; all `e()` scalars and macros continue to match v0.1.1 numerically
+- Accompanying Stata Journal paper aligned with package output: Theorem 2 coverage target stated as the onset-relative DID summary delta_bar, with a remark connecting to the ATT under the onset normalization
+
+---
+
 ## [0.1.1] - 2026-04-02
 
 ### Fixed

@@ -1,5 +1,5 @@
 *! pretest - Conditional Extrapolation Pre-Test for Difference-in-Differences
-*! Version 0.1.1
+*! Version 0.1.2
 *!
 *! Reference:
 *!   Mikhaeil, J.M. and C. Harshaw. 2025. "In Defense of the Pre-Test: Valid
@@ -191,10 +191,40 @@ program define pretest, eclass
     }
     
     // =========================================================================
+    // STEP 0.3: Synchronize the estimation sample when cluster() is used
+    // =========================================================================
+    // Without this step, marksample leaves rows with missing treatment, time,
+    // or cluster values in touse.  The Mata estimators drop them implicitly
+    // when computing group means, but the cluster-robust covariance routine
+    // uses all rows in touse, so e(Sigma), e(f_alpha), and the pass-case CI
+    // endpoints can drift relative to e(delta_bar) and e(S_pre).  Aligning
+    // touse to the complete-case sample for outcome/treatment/time/cluster
+    // keeps the estimation sample fixed across point and covariance
+    // estimation, which is the assumption the stored-results surface makes.
+    qui count if `touse'
+    local n_input_rows = r(N)
+    if "`cluster'" != "" {
+        qui count if `touse' & (missing(`outcome') | missing(`treatment') ///
+            | missing(`time') | missing(`cluster'))
+        local n_cluster_drop = r(N)
+        if `n_cluster_drop' > 0 {
+            qui replace `touse' = 0 if missing(`outcome') ///
+                | missing(`treatment') | missing(`time') | missing(`cluster')
+            di as text "Note: `n_cluster_drop' observation(s) with missing" ///
+                " outcome/treatment/time/cluster dropped to align the" ///
+                " cluster-robust covariance with the point estimation sample."
+        }
+    }
+
+    // =========================================================================
     // STEP 1: Validate input data
     // =========================================================================
     _pretest_validate `outcome' if `touse', treatment(`treatment') time(`time')
-    local n_total_obs = r(n_total)
+    // Preserve the input row count for e(n_total); the validate module
+    // reports the post-alignment count, but e(n_total) should reflect the
+    // rows the command received after if/in filtering so that the gap
+    // against e(N) is interpretable as "rows dropped by the command".
+    local n_total_obs = `n_input_rows'
     
     // Verify complete cell coverage: the parameter vector
     // theta = (nu_2,...,nu_{t0-1}, delta_{t0},...,delta_T) requires observations
@@ -542,6 +572,17 @@ program define pretest, eclass
         local ci_conv_hi_arg = `ci_conv_hi'
     }
     
+    // Pass S_pre_se to _pretest_output so the header includes a Delta-method SE
+    // row when available (missing under p=infinity).  Option name is sdpre to
+    // avoid abbreviation clash with se_delta and to keep the option name in a
+    // single Stata token (no embedded underscores).
+    if !missing(`S_pre_se_val') {
+        local sdpre_arg = `S_pre_se_val'
+    }
+    else {
+        local sdpre_arg = -999
+    }
+
     _pretest_output, ///
         threshold(`threshold') ///
         mode("`mode'") ///
@@ -549,11 +590,13 @@ program define pretest, eclass
         level(`level') ///
         t(`T') ///
         t0(`t0') ///
+        orig_t0(`t0_orig') ///
         t_pre(`T_pre') ///
         t_post(`T_post') ///
         n(`n_result') ///
         p(`p') ///
         s_pre(`S_pre_result') ///
+        sdpre(`sdpre_arg') ///
         kappa(`kappa_result') ///
         f_alpha(`f_alpha_result') ///
         phi(`phi_int') ///

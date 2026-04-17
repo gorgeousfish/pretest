@@ -1,5 +1,5 @@
 {smcl}
-{* *! version 0.1.1  02apr2026}{...}
+{* *! version 0.1.2  17apr2026}{...}
 {vieweralsosee "[R] regress" "help regress"}{...}
 {vieweralsosee "[XT] xtreg" "help xtreg"}{...}
 {vieweralsosee "[XT] xtset" "help xtset"}{...}
@@ -47,7 +47,7 @@
 {synopt:{opt p(#)}}severity norm p >= 1; default is {cmd:p(2)}{p_end}
 {synopt:{opt al:pha(#)}}nominal significance level for interval construction; if omitted, follows Stata's current confidence level{p_end}
 {synopt:{opt level(#)}}nominal confidence level (%) for interval construction; if omitted, follows Stata's current confidence level{p_end}
-{synopt:{opt cl:uster(varname)}}cluster variable for robust standard errors after explicit sample prep{p_end}
+{synopt:{opt cl:uster(varname)}}cluster variable for robust standard errors; sample is auto-aligned to complete cases{p_end}
 {synopt:{opt over:all}}use cumulative-violation path (no kappa multiplier){p_end}
 {synopt:{opt nog:raph}}suppress event study graph{p_end}
 {synopt:{opt sim:ulate(#)}}Monte Carlo simulations; default is {cmd:simulate(5000)}{p_end}
@@ -269,18 +269,13 @@ cluster-robust standard errors. Typically the panel identifier (e.g., state,
 firm) for panel data.
 
 {pmore}
-Use clustered conditional inference only after explicitly deleting rows with
-missing outcome, treatment, or time values. In the current workflow, leaving
-that cleanup to the command's internal complete-case filter can change
-covariance-dependent objects such as {cmd:e(Sigma)}, {cmd:f_alpha}, and the
-pass-case interval even when {cmd:e(delta_bar)} and {cmd:e(S_pre)} stay
-fixed. The safer practice is to prepare the analysis sample first and then
-compare clustered and non-clustered runs on that same sample.
-
-{pmore}
-Before clustered runs, subset the analysis sample explicitly and rerun
-{cmd:pretest} on that fixed sample; inline {cmd:[if] [in]} restrictions are
-not a supported substitute for this workflow.
+When {cmd:cluster()} is supplied, the command automatically aligns the
+estimation sample to rows with non-missing values of the outcome,
+treatment, time, and cluster variables, and prints a note reporting how
+many rows were dropped for this alignment. No manual pre-cleaning is
+required. The analysis sample should still be fixed (via {cmd:keep if}
+before the call) when comparing clustered and non-clustered runs, because
+sample changes reset all four outputs.
 
 {phang}
 {opt overall} specifies the cumulative-violation path instead of iterative
@@ -430,11 +425,11 @@ summary by adding {cmd:overall}. It returns {cmd:N = 429},
 {cmd:[-25.1525, 6.4683]}. Read this as the cumulative-violation version of the
 same trimmed-sample question.{p_end}
 
-{pstd}{bf:Clustered reruns come after the ladder.} First delete rows with
-missing outcome, treatment, or time values, then rerun {cmd:pretest} on that
-cleaned sample:{p_end}
+{pstd}{bf:Clustered reruns come after the ladder.} Clustered inference is
+requested with {cmd:cluster()}; the command auto-aligns the sample to
+complete cases of outcome/treatment/time/cluster and reports how many rows
+were dropped:{p_end}
 
-{phang2}{cmd:. drop if missing(cigsale, treated, year)}{p_end}
 {phang2}{cmd:. pretest cigsale, treatment(treated) time(year) treat_time(1989) threshold(5) cluster(state)}{p_end}
 
 {pstd}That rerun checks clustered inference on a fixed sample. It is not a
@@ -657,7 +652,7 @@ q = p/(p-1) for p > 1, q = infinity for p = 1, and q = 1 for p = infinity.
 Closed-form solutions for common choices of p:
 
 {phang2}p = 1:     kappa = T_post (worst-case accumulation){p_end}
-{phang2}p = 2:     kappa = sqrt((T_post+1)(2*T_post+1)/(6*T_post)) (L2 self-dual){p_end}
+{phang2}p = 2:     kappa = sqrt((T_post+1)(2*T_post+1)/6) (L2 self-dual){p_end}
 {phang2}p = inf:   kappa = (T_post+1)/2 (arithmetic mean of time weights){p_end}
 
 {pstd}
@@ -750,7 +745,7 @@ and the Stata implementation:
 {bf:APA Format:}
 
 {phang2}Cai, X., & Xu, W. (2025). {it:pretest: Stata module to implement the conditional}
-{it:extrapolation pre-test for difference-in-differences} (Version 0.1.1) [Computer software].
+{it:extrapolation pre-test for difference-in-differences} (Version 0.1.2) [Computer software].
 GitHub. {browse "https://github.com/gorgeousfish/pretest"}{p_end}
 
 {phang2}Mikhaeil, J. M., & Harshaw, C. (2025). In Defense of the Pre-Test: Valid Inference
@@ -765,7 +760,7 @@ when Testing Violations of Parallel Trends for Difference-in-Differences.
                        extrapolation pre-test for difference-in-differences{c )-},
               author = {c -(}Xuanyu Cai and Wenli Xu{c )-},
               year = {c -(}2025{c )-},
-              version = {c -(}0.1.1{c )-},
+              version = {c -(}0.1.2{c )-},
               url = {c -(}https://github.com/gorgeousfish/pretest{c )-}
         {c )-}
 

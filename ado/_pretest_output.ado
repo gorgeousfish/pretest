@@ -1,5 +1,5 @@
 *! _pretest_output.ado
-*! Version 0.1.1
+*! Version 0.1.2
 *!
 *! Title: Formatted Output Display for Conditional Extrapolation Pre-Test
 *!
@@ -64,8 +64,10 @@ program define _pretest_output, rclass
          CI_conv_lower(real -999) ///
          CI_conv_upper(real -999) ///
          SE_delta(real -999) ///
+         SDPRE(real -999) ///
          SIMS(integer 5000) ///
-         SEED(integer 12345)]
+         SEED(integer 12345) ///
+         ORIG_t0(integer -999999)]
     
     // =========================================================================
     // Section 1: Header
@@ -106,12 +108,12 @@ program define _pretest_output, rclass
     // Row 2: Significance level alpha and corresponding confidence level
     local alpha_fmt : di %5.3f `alpha'
     local level_fmt : di %5.1f `level'
-    di as text _col(`col1') "Alpha (α):" _col(`col2') as result "`alpha_fmt'" ///
+    di as text _col(`col1') "Alpha:" _col(`col2') as result "`alpha_fmt'" ///
        as text _col(`col3') "Confidence:" _col(`col4') as result "`level_fmt'%"
     
     // Row 3: p-norm exponent for severity aggregation (p=inf uses sup-norm)
     if `p' >= 1e10 {
-        local p_display "∞"
+        local p_display "inf"
     }
     else {
         local p_display : di %3.1f `p'
@@ -127,11 +129,21 @@ program define _pretest_output, rclass
     di as text "{bf:Time Structure}"
     di as text "{hline 72}"
     
+    // Display calendar-valued t0 when supplied; otherwise fall back to internal index.
+    // This matches the paper stlog which reports the original time variable value
+    // (e.g., year=1989) rather than the internal consecutive index.
+    if `orig_t0' != -999999 {
+        local t0_display "`orig_t0'"
+    }
+    else {
+        local t0_display "`t0'"
+    }
+    
     di as text _col(`col1') "Total periods (T):" _col(`col2') as result "`t'" ///
-       as text _col(`col3') "Treat time (t₀):" _col(`col4') as result "`t0'"
+       as text _col(`col3') "Treat time (t0):" _col(`col4') as result "`t0_display'"
     
     di as text _col(`col1') "Pre-treatment (T_pre):" _col(`col2') as result "`t_pre'" ///
-       as text _col(`col3') "Post-treatment (T_post):" _col(`col4') as result "`t_post'"
+       as text _col(`col3') "Post-treatment:" _col(`col4') as result "`t_post'"
     
     local n_fmt : di %9.0fc `n'
     local n_fmt = strtrim("`n_fmt'")
@@ -149,9 +161,18 @@ program define _pretest_output, rclass
     // Estimated severity of pre-treatment parallel trends violations
     // S_pre = (1/(T_pre-1) * sum |nu_t|^p)^{1/p} for iterative violations
     // S_pre = (1/(T_pre-1) * sum |nu_bar_t|^p)^{1/p} for overall violations
-    local S_pre_fmt : di %9.4f `s_pre'
+    local S_pre_fmt : di %9.3f `s_pre'
     local S_pre_fmt = strtrim("`S_pre_fmt'")
-    di as text _col(`col1') "Severity (Ŝ_pre):" _col(`col2') as result "`S_pre_fmt'"
+    di as text _col(`col1') "Severity (S_pre):" _col(`col2') as result "`S_pre_fmt'"
+
+    // Delta-method standard error for S_pre (p>=1 only; missing for p=inf)
+    // Reporting SE(S_pre) alongside S_pre lets readers assess gate-decision
+    // sensitivity to sampling noise when |S_pre - M| is small.
+    if `sdpre' != -999 & !missing(`sdpre') {
+        local S_pre_se_fmt : di %9.3f `sdpre'
+        local S_pre_se_fmt = strtrim("`S_pre_se_fmt'")
+        di as text _col(`col1') "SE(S_pre):" _col(`col2') as result "`S_pre_se_fmt'"
+    }
     
     // Kappa: bias amplification factor from Proposition 1 (Mikhaeil & Harshaw 2025)
     // kappa = (1/T_post * sum_{t=1}^{T_post} t^q)^{1/q} where 1/p + 1/q = 1
@@ -159,17 +180,17 @@ program define _pretest_output, rclass
     if "`mode'" == "iterative" {
         local kappa_fmt : di %9.3f `kappa'
         local kappa_fmt = strtrim("`kappa_fmt'")
-        di as text _col(`col1') "Kappa (κ):" _col(`col2') as result "`kappa_fmt'"
+        di as text _col(`col1') "Kappa:" _col(`col2') as result "`kappa_fmt'"
     }
     else {
-        di as text _col(`col1') "Kappa (κ):" _col(`col2') as result "{it:N/A}" as text "  (overall mode uses Ŝ_pre directly)"
+        di as text _col(`col1') "Kappa:" _col(`col2') as result "{it:N/A}" as text "  (overall mode uses S_pre directly)"
     }
     
     // Critical value from the (1-alpha) quantile of psi(Z) where Z ~ N(0, Sigma_hat)
     // See Theorem 2 and Appendix D.5 in Mikhaeil & Harshaw (2025)
     local f_alpha_fmt : di %9.3f `f_alpha'
     local f_alpha_fmt = strtrim("`f_alpha_fmt'")
-    di as text _col(`col1') "Critical value f(α,Σ̂):" _col(`col2') as result "`f_alpha_fmt'"
+    di as text _col(`col1') "Critical value f(a,S):" _col(`col2') as result "`f_alpha_fmt'"
     
     // Pre-test decision based on Theorem 1: phi = 1{S_pre_hat > M}
     // phi = 0 => PASS: extrapolation condition satisfied, proceed with inference
@@ -184,12 +205,12 @@ program define _pretest_output, rclass
     else if `phi' == 0 {
         di as text _col(`col1') "Pre-test result:" ///
            _col(`col2') as result "{bf:{col 32}PASS}" ///
-           as text " (Ŝ_pre ≤ M, extrapolation acceptable)"
+           as text " (S_pre <= M, extrapolation acceptable)"
     }
     else {
         di as text _col(`col1') "Pre-test result:" ///
            _col(`col2') as text "{bf:{col 32}FAIL}" ///
-           as text " (Ŝ_pre > M, extrapolation rejected)"
+           as text " (S_pre > M, extrapolation rejected)"
     }
     
     // =========================================================================
@@ -204,7 +225,7 @@ program define _pretest_output, rclass
     // This estimates the identified DID estimand, which equals ATT under parallel trends
     _pretest_format_number `delta_bar'
     local delta_bar_fmt = r(formatted)
-    di as text _col(`col1') "δ̄ (change vs t₀):" _col(`col2') as result "`delta_bar_fmt'"
+    di as text _col(`col1') "delta_bar (vs t0):" _col(`col2') as result "`delta_bar_fmt'"
     
     // Conditionally valid confidence interval from Theorem 2
     // Valid only when phi = 0 (pre-test passes) under well-separated null
@@ -258,19 +279,19 @@ program define _pretest_output, rclass
     di as text ""
     di as text "{hline 72}"
     if missing(`phi') {
-        di as text "Note: φ = 1{Ŝ_pre > M}; pre-test decision unavailable (data issue)"
+        di as text "Note: phi = 1{S_pre > M}; pre-test decision unavailable (data issue)"
     }
     else {
-        di as text "Note: φ = 1{Ŝ_pre > M}; PASS means φ=0 (extrapolation justified)"
+        di as text "Note: phi = 1{S_pre > M}; PASS means phi=0 (extrapolation justified)"
     }
     if "`mode'" == "iterative" {
-        di as text "      Iterative mode: CI = δ̄ ± {κ·Ŝ_pre + f(α,Σ̂)/√n}"
+        di as text "      Iterative mode: CI = delta_bar +/- {kappa*S_pre + f(a,S)/sqrt(n)}"
     }
     else {
-        di as text "      Overall mode: CI = δ̄ ± {Ŝ_pre + f(α,Σ̂)/√n} (no κ)"
+        di as text "      Overall mode: CI = delta_bar +/- {S_pre + f(a,S)/sqrt(n)} (no kappa)"
     }
     di as text "{hline 72}"
-    di as text "{it:Note: δ̄ measures change relative to t₀, NOT the ATT level. See {help pretest##results:help pretest}.}"
+    di as text "{it:Note: delta_bar measures change relative to t0, NOT the ATT level. See {help pretest##results:help pretest}.}"
 end
 
 // =============================================================================
